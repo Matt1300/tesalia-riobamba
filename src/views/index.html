@@ -2634,6 +2634,7 @@
 
       /* ─── Auditoría ──────────────────────────────────────────────────────────── */
       function makeAuditoriaPage() {
+        var LIMITE = 200;
         function _load(container, emailFiltro) {
           UI.showLoading(container);
           (emailFiltro
@@ -2642,7 +2643,6 @@
           )
             .then(function (data) {
               var rows = data
-                .slice(0, 100)
                 .map(function (a) {
                   var ok = a.resultado === "EXITO";
                   return (
@@ -2667,6 +2667,8 @@
                   );
                 })
                 .join("");
+              var titulo = "&#218;ltimos " + data.length + " registros" +
+                (data.length === LIMITE ? " (l&#237;mite " + LIMITE + ")" : "");
               container.innerHTML =
                 '<div class="card" style="margin-bottom:16px"><div class="toolbar"><div class="filter-bar">' +
                 '<input type="email" class="form-control" id="au-e" value="' +
@@ -2675,9 +2677,9 @@
                 '<button class="btn btn-secondary" id="btn-au-f">Filtrar</button>' +
                 '<button class="btn btn-secondary" id="btn-au-l">Ver todos</button>' +
                 "</div></div></div>" +
-                '<div class="card"><div class="card-title">Auditor&#237;a (' +
-                (data.length > 100 ? "100+ registros" : data.length) +
-                ")</div>" +
+                '<div class="card"><div class="card-title">Auditor&#237;a &mdash; ' +
+                titulo +
+                "</div>" +
                 (data.length === 0
                   ? '<div class="empty-state"><div class="empty-state-icon">&#128269;</div><p>Sin registros</p></div>'
                   : '<div class="table-wrapper"><table><thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Acci&#243;n</th><th>Entidad</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>' +

@@ -43,15 +43,28 @@ namespace AuditoriaRepository {
     BaseRepository.appendRow(SHEET, auditoriaToRow(auditoria));
   }
 
-  export function findAll(): Models.Auditoria[] {
-    return BaseRepository.getAllRows(SHEET).map(rowToAuditoria);
+  /**
+   * Retorna los últimos `limite` registros de auditoría, más reciente primero.
+   * Solo lee las filas necesarias del sheet (no carga todo en memoria).
+   */
+  export function findRecent(limite = 200): Models.Auditoria[] {
+    return BaseRepository.getLastRows(SHEET, limite).map(rowToAuditoria);
   }
 
-  export function findByUsuario(email: string): Models.Auditoria[] {
-    return BaseRepository.filterRows(
-      SHEET,
-      row => String(row[C.USUARIO_EMAIL]) === email
-    ).map(rowToAuditoria);
+  /**
+   * Retorna los últimos `limite` registros de un usuario, más reciente primero.
+   * Lee todas las filas pero solo serializa las que coinciden.
+   */
+  export function findByUsuario(email: string, limite = 200): Models.Auditoria[] {
+    const allRows = BaseRepository.getAllRows(SHEET);
+    const result: Models.Auditoria[] = [];
+    // Recorrer de atrás hacia adelante para obtener los más recientes primero
+    for (let i = allRows.length - 1; i >= 0 && result.length < limite; i--) {
+      if (String(allRows[i][C.USUARIO_EMAIL]) === email) {
+        result.push(rowToAuditoria(allRows[i]));
+      }
+    }
+    return result;
   }
 
   export function findByEntidad(entidad: string, entidadId: string): Models.Auditoria[] {

@@ -79,6 +79,26 @@ namespace BaseRepository {
   }
 
   /**
+   * Retorna las últimas `limite` filas en orden inverso (más reciente primero).
+   * Mucho más eficiente que getAllRows() + slice cuando la hoja es grande,
+   * porque solo lee el rango necesario desde el final de la hoja.
+   */
+  export function getLastRows(sheetName: string, limite: number): unknown[][] {
+    const sheet = getSheet(sheetName);
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return [];
+    const lastCol = sheet.getLastColumn();
+    if (lastCol === 0) return [];
+
+    const totalData = lastRow - 1; // excluir cabecera
+    const numRows   = Math.min(limite, totalData);
+    const startRow  = lastRow - numRows + 1; // fila en el sheet (1-based)
+
+    const rows = sheet.getRange(startRow, 1, numRows, lastCol).getValues();
+    return rows.reverse(); // más reciente primero
+  }
+
+  /**
    * Actualiza una celda específica por rowIndex y colIndex (ambos 0-based para datos).
    */
   export function updateCell(

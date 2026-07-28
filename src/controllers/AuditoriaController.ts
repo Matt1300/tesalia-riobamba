@@ -8,12 +8,14 @@ namespace AuditoriaController {
       RoleGuard.requirePermission(session, Auth.Permission.VER_AUDITORIA);
       const p = payload as Record<string, unknown>;
 
+      const limite = typeof p['limite'] === 'number' ? p['limite'] : 200;
+
       switch (method) {
         case 'getAll':
-          return API.ok(AuditoriaRepository.findAll());
+          return API.ok(AuditoriaRepository.findRecent(limite));
 
         case 'getByUsuario':
-          return API.ok(AuditoriaRepository.findByUsuario(p['email'] as string));
+          return API.ok(AuditoriaRepository.findByUsuario(p['email'] as string, limite));
 
         case 'getByEntidad':
           return API.ok(
