@@ -85,8 +85,8 @@
     td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     tr:hover td { background: #f8f9ff; }
     tfoot td { font-weight: 600; background: var(--bg); }
-    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
-    .empty-state-icon { font-size: 40px; margin-bottom: 8px; }
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .empty-state-icon { font-size: 40px; }
 
     /* Estado badges */
     .status { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
@@ -585,6 +585,19 @@
           .then(function() { Modal.hide(); Toast.success('Registro creado'); _load(container, _filtro); })
           .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
       }});
+
+      // Filtrar camiones al cambiar el chofer seleccionado
+      var choferSel = Modal._el.querySelector('#m-chofer');
+      var camionSel = Modal._el.querySelector('#m-camion');
+      function _updateCamiones() {
+        var cId = choferSel.value;
+        var filtrados = _camiones.filter(function(c) { return c.activo && c.choferId === cId; });
+        camionSel.innerHTML = filtrados.length > 0
+          ? filtrados.map(function(c) { return '<option value="' + c.camionId + '">' + c.patente + (c.modelo ? ' &mdash; ' + c.modelo : '') + '</option>'; }).join('')
+          : '<option value="">Sin cami&#243;n asignado</option>';
+      }
+      choferSel.addEventListener('change', _updateCamiones);
+      _updateCamiones(); // aplicar al cargar con el chofer inicial
     }
 
     function _openEdit(container, r) {
