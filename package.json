@@ -1,0 +1,21 @@
+{
+  "name": "tesalia-riobamba",
+  "version": "0.1.0",
+  "description": "Sistema de control de pagos por rutas de camiones - Tesalia Riobamba",
+  "private": true,
+  "scripts": {
+    "build": "tsc && cp src/appsscript.json dist/ && cp -r src/views dist/",
+    "push": "npm run build && clasp push",
+    "pull": "clasp pull",
+    "deploy": "clasp create-deployment",
+    "typecheck": "tsc --noEmit",
+    "watch": "tsc --watch"
+  },
+  "devDependencies": {
+    "@types/google-apps-script": "^1.0.83",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.5.0"
+  }
+}

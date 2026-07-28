@@ -1,0 +1,12 @@
+{
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "eslint.validate": ["typescript"],
+  "files.exclude": {
+    "node_modules": true
+  },
+  "files.associations": {
+    "*.html": "html"
+  }
+}

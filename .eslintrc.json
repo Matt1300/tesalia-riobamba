@@ -1,0 +1,28 @@
+{
+  "parser": "@typescript-eslint/parser",
+  "plugins": ["@typescript-eslint"],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "env": {
+    "es2019": true
+  },
+  "globals": {
+    "SpreadsheetApp": "readonly",
+    "HtmlService": "readonly",
+    "ContentService": "readonly",
+    "Session": "readonly",
+    "DriveApp": "readonly",
+    "FormApp": "readonly",
+    "ScriptApp": "readonly",
+    "Logger": "readonly",
+    "Utilities": "readonly",
+    "MailApp": "readonly"
+  },
+  "rules": {
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-function-return-type": "warn",
+    "no-console": "off"
+  }
+}

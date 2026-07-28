@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tesalia Riobamba</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --primary:      #1a73e8; --primary-dark: #1557b0; --secondary: #34a853;
+      --danger:       #ea4335; --warning:      #fbbc04; --text:       #202124;
+      --text-muted:   #5f6368; --border:       #dadce0; --bg:         #f8f9fa;
+      --surface:      #ffffff; --sidebar-w:    240px;   --topbar-h:   56px;
+      --radius:       8px;
+      --shadow:       0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+      --shadow-md:    0 4px 12px rgba(0,0,0,.12);
+      --transition:   0.2s ease;
+    }
+    html, body { height: 100%; font-family: 'Google Sans', Roboto, sans-serif; font-size: 14px; color: var(--text); background: var(--bg); }
+
+    /* Loading */
+    .loading-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; gap: 16px; color: var(--text-muted); }
+    .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Layout */
+    .layout { display: flex; height: 100vh; overflow: hidden; }
+
+    /* Sidebar */
+    .sidebar { width: var(--sidebar-w); background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; transition: transform var(--transition); }
+    .sidebar-header { display: flex; align-items: center; gap: 10px; padding: 16px; border-bottom: 1px solid var(--border); }
+    .sidebar-logo { font-size: 24px; }
+    .sidebar-title { font-weight: 600; font-size: 14px; color: var(--text); line-height: 1.2; }
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .nav-section { padding: 8px 16px 4px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 16px; cursor: pointer; color: var(--text-muted); transition: background var(--transition), color var(--transition); font-size: 14px; }
+    .nav-item:hover { background: var(--bg); color: var(--text); }
+    .nav-item.active { background: #e8f0fe; color: var(--primary); font-weight: 500; }
+    .nav-item .nav-icon { font-size: 18px; width: 22px; text-align: center; }
+    .sidebar-footer { padding: 12px 16px; border-top: 1px solid var(--border); }
+    .sidebar-user-email { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 8px; word-break: break-all; }
+    .btn-logout { width: 100%; padding: 8px; background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; color: var(--danger); font-size: 13px; transition: background var(--transition); }
+    .btn-logout:hover { background: #fce8e6; }
+
+    /* Main */
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    /* Topbar */
+    .topbar { height: var(--topbar-h); background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; padding: 0 20px; flex-shrink: 0; box-shadow: var(--shadow); }
+    .sidebar-toggle { background: none; border: none; cursor: pointer; font-size: 20px; color: var(--text-muted); display: none; }
+    .page-title { font-size: 18px; font-weight: 500; flex: 1; }
+    .topbar-right { display: flex; align-items: center; gap: 8px; }
+    .topbar-user { font-size: 13px; color: var(--text-muted); }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-admin  { background: #e8f0fe; color: var(--primary); }
+    .badge-chofer { background: #e6f4ea; color: var(--secondary); }
+
+    /* Content */
+    .content { flex: 1; overflow-y: auto; padding: 24px; }
+
+    /* Cards */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .card-title { font-size: 16px; font-weight: 500; margin-bottom: 16px; color: var(--text); }
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+    .stat-value { font-size: 28px; font-weight: 600; color: var(--primary); }
+    .stat-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+    /* Botones */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius); font-size: 14px; font-weight: 500; cursor: pointer; border: none; transition: background var(--transition); }
+    .btn-primary   { background: var(--primary); color: #fff; }
+    .btn-primary:hover  { background: var(--primary-dark); }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--bg); }
+    .btn-danger    { background: var(--danger); color: #fff; }
+    .btn-danger:hover   { background: #c62828; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Tabla */
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: var(--bg); color: var(--text-muted); font-weight: 600; text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
+    td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: #f8f9ff; }
+    tfoot td { font-weight: 600; background: var(--bg); }
+    .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+    .empty-state-icon { font-size: 40px; margin-bottom: 8px; }
+
+    /* Estado badges */
+    .status { padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .status-pendiente { background: #fef3cd; color: #856404; }
+    .status-validado  { background: #e6f4ea; color: #1e7e34; }
+    .status-rechazado { background: #fce8e6; color: #c62828; }
+
+    /* Badge extras */
+    .badge-activo   { background: #e6f4ea; color: #1e7e34; }
+    .badge-inactivo { background: #f5f5f5; color: #999; }
+    .badge-urbana   { background: #e8f0fe; color: #1557b0; }
+    .badge-rural    { background: #fce8e6; color: #c62828; }
+
+    /* Formularios */
+    .form-group { margin-bottom: 16px; }
+    .form-label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 500; color: var(--text); }
+    .form-control { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 14px; color: var(--text); background: var(--surface); transition: border-color var(--transition); }
+    .form-control:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,.2); }
+    .form-control:read-only { background: var(--bg); color: var(--text-muted); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    /* Toolbar y filtros */
+    .toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+    .filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .filter-bar .form-control { width: auto; min-width: 140px; }
+
+    /* Acciones en tabla */
+    .action-btns { display: flex; gap: 4px; }
+    .btn-icon { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 3px 8px; cursor: pointer; font-size: 13px; transition: background var(--transition); line-height: 1.4; }
+    .btn-icon:hover { background: var(--bg); }
+
+    /* Modal */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-dialog  { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow-md); width: 100%; max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; }
+    .modal-header  { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .modal-title   { font-size: 16px; font-weight: 500; }
+    .modal-close   { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); line-height: 1; padding: 0 4px; }
+    .modal-body    { padding: 20px; overflow-y: auto; flex: 1; }
+    .modal-footer  { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0; }
+
+    /* Toast */
+    .toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+    .toast { padding: 10px 18px; border-radius: var(--radius); font-size: 13px; color: #fff; box-shadow: var(--shadow-md); animation: toastIn .2s ease; max-width: 340px; }
+    .toast-success { background: var(--secondary); }
+    .toast-error   { background: var(--danger); }
+    .toast-info    { background: var(--primary); }
+    @keyframes toastIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* Sin acceso */
+    .no-access { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; gap: 12px; color: var(--text-muted); }
+    .no-access-icon { font-size: 56px; }
+    .no-access h2 { font-size: 24px; color: var(--text); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; left: 0; top: 0; height: 100%; z-index: 100; transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); box-shadow: var(--shadow-md); }
+      .sidebar-toggle { display: block; }
+      .form-row { grid-template-columns: 1fr; }
+      .filter-bar { flex-direction: column; align-items: stretch; }
+      .filter-bar .form-control { min-width: unset; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app">
+    <div class="loading-screen">
+      <div class="loading-spinner"></div>
+      <p>Cargando sistema...</p>
+    </div>
+  </div>
+
+  <template id="tpl-layout">
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <span class="sidebar-logo">&#x1F69B;</span>
+          <span class="sidebar-title" id="app-nombre"></span>
+        </div>
+        <nav class="sidebar-nav" id="sidebar-nav"></nav>
+        <div class="sidebar-footer">
+          <span id="sidebar-user-email" class="sidebar-user-email"></span>
+          <button class="btn-logout" id="btn-logout">Cerrar sesi&#243;n</button>
+        </div>
+      </aside>
+      <div class="main-wrapper">
+        <header class="topbar">
+          <button class="sidebar-toggle" id="sidebar-toggle">&#9776;</button>
+          <h1 class="page-title" id="page-title">Dashboard</h1>
+          <div class="topbar-right">
+            <span class="topbar-user" id="topbar-user"></span>
+            <span class="badge" id="topbar-role"></span>
+          </div>
+        </header>
+        <main class="content" id="content"></main>
+      </div>
+    </div>
+  </template>
+
+  <template id="tpl-no-access">
+    <div class="no-access">
+      <div class="no-access-icon">&#x1F6AB;</div>
+      <h2>Sin acceso</h2>
+      <p>Su cuenta no tiene acceso al sistema.</p>
+      <p>Contacte al administrador para solicitar acceso.</p>
+    </div>
+  </template>
+
+  <script>
+  /* ─── API Client ─────────────────────────────────────────────────────────── */
+  var API = {
+    call: function(action, payload) {
+      return new Promise(function(resolve, reject) {
+        google.script.run
+          .withSuccessHandler(function(res) {
+            try {
+              var parsed = typeof res === 'string' ? JSON.parse(res) : res;
+              if (!parsed) { reject(new Error('Respuesta vacía del servidor')); return; }
+              if (parsed.success) resolve(parsed.data);
+              else reject(new Error(parsed.error || 'Error desconocido'));
+            } catch(e) {
+              reject(new Error('Error al procesar respuesta: ' + e.message));
+            }
+          })
+          .withFailureHandler(function(err) { reject(new Error(err.message || 'Error del servidor')); })
+          .apiCall(action, payload || {});
+      });
+    },
+    registros: {
+      getAll:    function()        { return API.call('registros.getAll'); },
+      filtrar:   function(f)       { return API.call('registros.filtrar', f); },
+      crear:     function(dto)     { return API.call('registros.crear', dto); },
+      actualizar:function(id, dto) { return API.call('registros.actualizar', Object.assign({ id: id }, dto)); },
+      validar:   function(dto)     { return API.call('registros.validar', dto); },
+      eliminar:  function(id)      { return API.call('registros.eliminar', { id: id }); },
+    },
+    choferes: {
+      getAll:    function()        { return API.call('choferes.getAll'); },
+      crear:     function(dto)     { return API.call('choferes.crear', dto); },
+      actualizar:function(id, dto) { return API.call('choferes.actualizar', Object.assign({ id: id }, dto)); },
+      desactivar:function(id)      { return API.call('choferes.desactivar', { id: id }); },
+    },
+    camiones: {
+      getAll:    function()        { return API.call('camiones.getAll'); },
+      crear:     function(dto)     { return API.call('camiones.crear', dto); },
+      actualizar:function(id, dto) { return API.call('camiones.actualizar', Object.assign({ id: id }, dto)); },
+      desactivar:function(id)      { return API.call('camiones.desactivar', { id: id }); },
+    },
+    tarifas: {
+      getActivas:  function() { return API.call('tarifas.getActivas'); },
+      getHistorial:function() { return API.call('tarifas.getHistorial'); },
+      crear:       function(dto) { return API.call('tarifas.crear', dto); },
+    },
+    reportes: {
+      resumenPeriodo:function(f)         { return API.call('reportes.resumenPeriodo', f); },
+      reporteChofer: function(cId, f)    { return API.call('reportes.reporteChofer', Object.assign({ choferId: cId }, f)); },
+    },
+    usuarios: {
+      getAll:    function()        { return API.call('usuarios.getAll'); },
+      crear:     function(dto)     { return API.call('usuarios.crear', dto); },
+      actualizar:function(id, dto) { return API.call('usuarios.actualizar', Object.assign({ id: id }, dto)); },
+      desactivar:function(id)      { return API.call('usuarios.desactivar', { id: id }); },
+    },
+    auditoria: {
+      getAll:   function()      { return API.call('auditoria.getAll'); },
+      byUsuario:function(email) { return API.call('auditoria.getByUsuario', { email: email }); },
+    },
+  };
+
+  /* ─── Router ─────────────────────────────────────────────────────────────── */
+  var Router = {
+    routes: {},
+    register: function(path, renderer) { this.routes[path] = renderer; },
+    navigate: function(path) { window.location.hash = path; },
+    start: function() {
+      var self = this;
+      window.addEventListener('hashchange', function() { self._render(); });
+      this._render();
+    },
+    _render: function() {
+      var path = window.location.hash.slice(1) || 'dashboard';
+      var renderer = this.routes[path];
+      var content = document.getElementById('content');
+      if (!content) return;
+      document.querySelectorAll('.nav-item').forEach(function(el) {
+        el.classList.toggle('active', el.dataset.route === path);
+      });
+      if (renderer) {
+        var pt = document.getElementById('page-title');
+        if (pt) pt.textContent = renderer.title || path;
+        renderer.render(content);
+      } else {
+        content.innerHTML = '<div class="card"><p>P\u00e1gina no encontrada: ' + path + '</p></div>';
+      }
+    },
+  };
+
+  /* ─── Toast ──────────────────────────────────────────────────────────────── */
+  var Toast = {
+    _c: null,
+    _container: function() {
+      if (!this._c) {
+        this._c = document.createElement('div');
+        this._c.className = 'toast-container';
+        document.body.appendChild(this._c);
+      }
+      return this._c;
+    },
+    show: function(msg, type) {
+      var el = document.createElement('div');
+      el.className = 'toast toast-' + (type || 'info');
+      el.textContent = msg;
+      this._container().appendChild(el);
+      setTimeout(function() { el.remove(); }, 3500);
+    },
+    success: function(msg) { this.show(msg, 'success'); },
+    error:   function(msg) { this.show(msg, 'error'); },
+    info:    function(msg) { this.show(msg, 'info'); },
+  };
+
+  /* ─── Modal ──────────────────────────────────────────────────────────────── */
+  var Modal = {
+    _el: null,
+    show: function(opts) {
+      var title = opts.title || '';
+      var body  = opts.body  || '';
+      var onSave     = opts.onSave || null;
+      var saveLabel  = opts.saveLabel || 'Guardar';
+      var danger     = opts.danger || false;
+      if (this._el) this._el.remove();
+      this._el = document.createElement('div');
+      this._el.className = 'modal-overlay';
+      this._el.innerHTML =
+        '<div class="modal-dialog">' +
+          '<div class="modal-header">' +
+            '<span class="modal-title">' + title + '</span>' +
+            '<button class="modal-close" type="button">&times;</button>' +
+          '</div>' +
+          '<div class="modal-body">' + body + '</div>' +
+          '<div class="modal-footer">' +
+            '<button class="btn btn-secondary modal-cancel" type="button">Cancelar</button>' +
+            (onSave ? '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + ' modal-save" type="button">' + saveLabel + '</button>' : '') +
+          '</div>' +
+        '</div>';
+      document.body.appendChild(this._el);
+      var self = this;
+      this._el.querySelector('.modal-close').onclick  = function() { self.hide(); };
+      this._el.querySelector('.modal-cancel').onclick = function() { self.hide(); };
+      if (onSave) this._el.querySelector('.modal-save').onclick = onSave;
+      this._el.onclick = function(e) { if (e.target === self._el) self.hide(); };
+    },
+    hide: function() { if (this._el) { this._el.remove(); this._el = null; } },
+    val: function(id) {
+      var el = this._el && this._el.querySelector('#' + id);
+      return el ? el.value.trim() : '';
+    },
+    setLoading: function(on) {
+      var btn = this._el && this._el.querySelector('.modal-save');
+      if (btn) { btn.disabled = on; btn.textContent = on ? 'Guardando...' : btn.dataset.label || 'Guardar'; }
+    },
+  };
+
+  /* ─── UI Helpers ─────────────────────────────────────────────────────────── */
+  var UI = {
+    showLoading: function(container, msg) {
+      container.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div><p>' + (msg || 'Cargando...') + '</p></div>';
+    },
+    showError: function(container, msg) {
+      container.innerHTML = '<div class="empty-state"><p style="color:var(--danger)">&#9888; ' + msg + '</p></div>';
+    },
+    formatCurrency: function(amount) {
+      return '$' + Number(amount || 0).toFixed(2);
+    },
+    formatDate: function(val) {
+      if (!val) return '-';
+      var s = typeof val === 'string' ? val : new Date(val).toISOString();
+      var p = s.split('T')[0].split('-');
+      return p[2] + '/' + p[1] + '/' + p[0];
+    },
+    formatDateTime: function(val) {
+      if (!val) return '-';
+      try {
+        return new Date(val).toLocaleString('es-EC', {
+          timeZone: 'America/Guayaquil', day: '2-digit', month: '2-digit',
+          year: 'numeric', hour: '2-digit', minute: '2-digit'
+        });
+      } catch(e) { return String(val); }
+    },
+    statusBadge: function(estado) {
+      var map = { PENDIENTE: 'status-pendiente', VALIDADO: 'status-validado', RECHAZADO: 'status-rechazado' };
+      return '<span class="status ' + (map[estado] || '') + '">' + (estado || '-') + '</span>';
+    },
+    activoBadge: function(activo) {
+      return activo
+        ? '<span class="badge badge-activo">Activo</span>'
+        : '<span class="badge badge-inactivo">Inactivo</span>';
+    },
+    rutaBadge: function(tipo) {
+      if (!tipo) return '-';
+      return '<span class="badge badge-' + tipo.toLowerCase() + '">' + tipo + '</span>';
+    },
+    choferName: function(choferes, id) {
+      var c = choferes.filter(function(x) { return x.choferId === id; })[0];
+      return c ? c.nombre : (id || '-');
+    },
+    camionPatente: function(camiones, id) {
+      var c = camiones.filter(function(x) { return x.camionId === id; })[0];
+      return c ? c.patente : (id || '-');
+    },
+    choferOptions: function(choferes, selected) {
+      return choferes
+        .filter(function(c) { return c.activo; })
+        .map(function(c) {
+          return '<option value="' + c.choferId + '"' + (c.choferId === selected ? ' selected' : '') + '>' + c.nombre + '</option>';
+        }).join('');
+    },
+    camionOptions: function(camiones, selected) {
+      return camiones
+        .filter(function(c) { return c.activo; })
+        .map(function(c) {
+          return '<option value="' + c.camionId + '"' + (c.camionId === selected ? ' selected' : '') + '>' + c.patente + ' &mdash; ' + (c.modelo || '') + '</option>';
+        }).join('');
+    },
+  };
+
+  /* ─── Utilidades ─────────────────────────────────────────────────────────── */
+  function currentYearMonth() {
+    var d = new Date();
+    return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
+  }
+  function isoToday() {
+    return new Date().toISOString().split('T')[0];
+  }
+  function monthOptions(selected) {
+    var names = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return names.map(function(n, i) {
+      return '<option value="' + (i+1) + '"' + (i+1 === selected ? ' selected' : '') + '>' + n + '</option>';
+    }).join('');
+  }
+  function yearOptions(selected) {
+    var cur = new Date().getFullYear();
+    var html = '';
+    for (var y = cur; y >= cur - 3; y--)
+      html += '<option value="' + y + '"' + (y === selected ? ' selected' : '') + '>' + y + '</option>';
+    return html;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PÁGINAS
+  ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* ─── Dashboard ──────────────────────────────────────────────────────────── */
+  function makeDashboardPage() {
+    return {
+      title: 'Dashboard',
+      render: function(container) {
+        UI.showLoading(container);
+        var ym = currentYearMonth();
+        Promise.all([
+          API.choferes.getAll(),
+          API.camiones.getAll(),
+          API.registros.filtrar({ anio: ym.anio, mes: ym.mes }),
+        ]).then(function(r) {
+          var choferes = r[0], camiones = r[1], registros = r[2];
+          var actChoferes = choferes.filter(function(c) { return c.activo; }).length;
+          var actCamiones = camiones.filter(function(c) { return c.activo; }).length;
+          var totalMonto  = registros.reduce(function(s, x) { return s + (x.tarifaAplicada || 0); }, 0);
+          var pendientes  = registros.filter(function(x) { return x.estado === 'PENDIENTE'; }).length;
+          var monthName   = new Date(ym.anio, ym.mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+
+          var rows = registros.slice(0, 10).map(function(r) {
+            return '<tr><td>' + UI.formatDate(r.fecha) + '</td><td>' + UI.choferName(choferes, r.choferId) +
+              '</td><td>' + UI.camionPatente(camiones, r.camionId) + '</td><td>' + UI.rutaBadge(r.tipoRuta) +
+              '</td><td>' + UI.formatCurrency(r.tarifaAplicada) + '</td><td>' + UI.statusBadge(r.estado) + '</td></tr>';
+          }).join('');
+
+          container.innerHTML =
+            '<div class="cards-grid">' +
+              '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + registros.length + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Monto total del mes</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' + actChoferes + '</div><div class="stat-sub">de ' + choferes.length + ' total</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' + actCamiones + '</div><div class="stat-sub">de ' + camiones.length + ' total</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Pendientes de validar</div><div class="stat-value" style="color:var(--warning)">' + pendientes + '</div><div class="stat-sub">del mes actual</div></div>' +
+            '</div>' +
+            '<div class="card"><div class="card-title">&#218;ltimos registros del mes</div>' +
+            (registros.length === 0
+              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros este mes</p></div>'
+              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            ) + '</div>';
+        }).catch(function(e) { UI.showError(container, e.message); });
+      }
+    };
+  }
+
+  /* ─── Registros ──────────────────────────────────────────────────────────── */
+  function makeRegistrosPage(session) {
+    var isAdmin = session.rol === 'ADMIN';
+    var _choferes = [], _camiones = [], _data = [], _filtro = {};
+
+    function _load(container, filtro) {
+      _filtro = filtro || {};
+      UI.showLoading(container);
+      Promise.all([API.choferes.getAll(), API.camiones.getAll()])
+        .then(function(r) { _choferes = r[0]; _camiones = r[1]; return API.registros.filtrar(_filtro); })
+        .then(function(data) { _data = data; _renderPage(container); })
+        .catch(function(e) { UI.showError(container, e.message); });
+    }
+
+    function _renderPage(container) {
+      var choferOpts = '<option value="">Todos los choferes</option>' +
+        _choferes.map(function(c) {
+          return '<option value="' + c.choferId + '"' + (_filtro.choferId === c.choferId ? ' selected' : '') + '>' + c.nombre + '</option>';
+        }).join('');
+
+      var rows = _data.map(function(r) {
+        var canEdit = isAdmin || r.choferId === session.choferId;
+        var btns = '';
+        if (canEdit && r.estado === 'PENDIENTE') btns += '<button class="btn-icon" data-action="edit" data-id="' + r.registroId + '" title="Editar">&#9998;</button>';
+        if (isAdmin && r.estado === 'PENDIENTE') btns += '<button class="btn-icon" data-action="validar" data-id="' + r.registroId + '" title="Validar">&#10003;</button>';
+        if (isAdmin && r.estado === 'PENDIENTE') btns += '<button class="btn-icon" data-action="rechazar" data-id="' + r.registroId + '" title="Rechazar">&#10005;</button>';
+        if (isAdmin)                              btns += '<button class="btn-icon" data-action="delete" data-id="' + r.registroId + '" title="Eliminar">&#128465;</button>';
+        return '<tr><td>' + UI.formatDate(r.fecha) + '</td><td>' + UI.choferName(_choferes, r.choferId) +
+          '</td><td>' + UI.camionPatente(_camiones, r.camionId) + '</td><td>' + UI.rutaBadge(r.tipoRuta) +
+          '</td><td>' + UI.formatCurrency(r.tarifaAplicada) + '</td><td>' + UI.statusBadge(r.estado) +
+          '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.observaciones || '-') +
+          '</td><td><div class="action-btns">' + btns + '</div></td></tr>';
+      }).join('');
+
+      container.innerHTML =
+        '<div class="card" style="margin-bottom:16px"><div class="toolbar">' +
+          '<div class="filter-bar">' +
+            '<input type="date" class="form-control" id="f-desde" value="' + (_filtro.fechaDesde || '') + '">' +
+            '<input type="date" class="form-control" id="f-hasta" value="' + (_filtro.fechaHasta || '') + '">' +
+            '<select class="form-control" id="f-chofer">' + choferOpts + '</select>' +
+            '<select class="form-control" id="f-estado">' +
+              '<option value="">Todos los estados</option>' +
+              '<option value="PENDIENTE"' + (_filtro.estado === 'PENDIENTE' ? ' selected' : '') + '>Pendiente</option>' +
+              '<option value="VALIDADO"'  + (_filtro.estado === 'VALIDADO'  ? ' selected' : '') + '>Validado</option>' +
+              '<option value="RECHAZADO"' + (_filtro.estado === 'RECHAZADO' ? ' selected' : '') + '>Rechazado</option>' +
+            '</select>' +
+            '<button class="btn btn-secondary" id="btn-filtrar">Filtrar</button>' +
+            '<button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>' +
+          '</div>' +
+          '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>' +
+        '</div></div>' +
+        '<div class="card"><div class="card-title">Registros (' + _data.length + ')</div>' +
+        (_data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para los filtros seleccionados</p></div>'
+          : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Obs.</th><th>Acciones</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+        ) + '</div>';
+
+      container.querySelector('#btn-filtrar').onclick = function() {
+        _load(container, {
+          fechaDesde: container.querySelector('#f-desde').value || undefined,
+          fechaHasta: container.querySelector('#f-hasta').value || undefined,
+          choferId:   container.querySelector('#f-chofer').value || undefined,
+          estado:     container.querySelector('#f-estado').value || undefined,
+        });
+      };
+      container.querySelector('#btn-limpiar').onclick = function() { _load(container, {}); };
+      container.querySelector('#btn-nuevo-reg').onclick = function() { _openCreate(container); };
+
+      container.querySelectorAll('[data-action]').forEach(function(btn) {
+        btn.onclick = function() {
+          var id = btn.dataset.id;
+          var r  = _data.filter(function(x) { return x.registroId === id; })[0];
+          if (btn.dataset.action === 'edit')    _openEdit(container, r);
+          if (btn.dataset.action === 'validar') _confirmValidar(container, id, 'VALIDADO');
+          if (btn.dataset.action === 'rechazar')_confirmValidar(container, id, 'RECHAZADO');
+          if (btn.dataset.action === 'delete')  _confirmDelete(container, id);
+        };
+      });
+    }
+
+    function _form(r) {
+      var chSel = UI.choferOptions(_choferes, r ? r.choferId : '');
+      var caSel = UI.camionOptions(_camiones, r ? r.camionId : '');
+      var tipoU = !r || r.tipoRuta === 'URBANA';
+      var fecha = r ? (r.fecha || '').split('T')[0] : isoToday();
+      return '<div class="form-row">' +
+        '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="m-fecha" value="' + fecha + '"></div>' +
+        '<div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="m-tipo"><option value="URBANA"' + (tipoU ? ' selected' : '') + '>Urbana</option><option value="RURAL"' + (!tipoU ? ' selected' : '') + '>Rural</option></select></div>' +
+        '</div><div class="form-row">' +
+        '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="m-chofer"' + (r ? ' disabled' : '') + '>' + chSel + '</select></div>' +
+        '<div class="form-group"><label class="form-label">Cami&#243;n *</label><select class="form-control" id="m-camion"' + (r ? ' disabled' : '') + '>' + caSel + '</select></div>' +
+        '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="m-obs" rows="2">' + (r ? (r.observaciones || '') : '') + '</textarea></div>';
+    }
+
+    function _openCreate(container) {
+      Modal.show({ title: 'Nuevo Registro', body: _form(null), onSave: function() {
+        var fecha = Modal.val('m-fecha'), choferId = Modal.val('m-chofer'), camionId = Modal.val('m-camion');
+        if (!fecha || !choferId || !camionId) { Toast.error('Completa todos los campos requeridos'); return; }
+        Modal.setLoading(true);
+        API.registros.crear({ fecha: fecha, choferId: choferId, camionId: camionId, tipoRuta: Modal.val('m-tipo'), observaciones: Modal.val('m-obs') || undefined, origen: 'MANUAL' })
+          .then(function() { Modal.hide(); Toast.success('Registro creado'); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    function _openEdit(container, r) {
+      Modal.show({ title: 'Editar Registro', body: _form(r), onSave: function() {
+        Modal.setLoading(true);
+        API.registros.actualizar(r.registroId, { fecha: Modal.val('m-fecha') || undefined, tipoRuta: Modal.val('m-tipo') || undefined, observaciones: Modal.val('m-obs') || undefined })
+          .then(function() { Modal.hide(); Toast.success('Registro actualizado'); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    function _confirmValidar(container, id, estado) {
+      var label = estado === 'VALIDADO' ? 'Validar' : 'Rechazar';
+      Modal.show({ title: label + ' Registro', danger: estado === 'RECHAZADO', saveLabel: label,
+        body: '<p>&#191;Confirmar ' + label.toLowerCase() + ' este registro?</p><div class="form-group" style="margin-top:12px"><label class="form-label">Motivo (opcional)</label><input type="text" class="form-control" id="m-motivo" placeholder="Motivo..."></div>',
+        onSave: function() {
+          Modal.setLoading(true);
+          API.registros.validar({ registroId: id, estado: estado, motivo: Modal.val('m-motivo') || undefined })
+            .then(function() { Modal.hide(); Toast.success('Registro ' + estado.toLowerCase()); _load(container, _filtro); })
+            .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+        }
+      });
+    }
+
+    function _confirmDelete(container, id) {
+      Modal.show({ title: 'Eliminar Registro', danger: true, saveLabel: 'Eliminar',
+        body: '<p>&#191;Est&#225;s seguro? Esta acci&#243;n no se puede deshacer.</p>',
+        onSave: function() {
+          Modal.setLoading(true);
+          API.registros.eliminar(id)
+            .then(function() { Modal.hide(); Toast.success('Registro eliminado'); _load(container, _filtro); })
+            .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+        }
+      });
+    }
+
+    return { title: 'Registros', render: function(container) { _load(container, {}); } };
+  }
+
+  /* ─── Reportes ───────────────────────────────────────────────────────────── */
+  function makeReportesPage() {
+    function _loadReporte(el, anio, mes) {
+      UI.showLoading(el);
+      API.reportes.resumenPeriodo({ anio: anio, mes: mes })
+        .then(function(data) {
+          var items = Array.isArray(data) ? data : (data ? [data] : []);
+          if (items.length === 0) {
+            el.innerHTML = '<div class="card"><div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>Sin datos para el per&#237;odo seleccionado</p></div></div>';
+            return;
+          }
+          var totalMonto   = items.reduce(function(s,r) { return s+(r.montoTotal||0); }, 0);
+          var totalReg     = items.reduce(function(s,r) { return s+(r.totalRegistros||0); }, 0);
+          var totalUrbanas = items.reduce(function(s,r) { return s+(r.totalUrbanas||0); }, 0);
+          var totalRurales = items.reduce(function(s,r) { return s+(r.totalRurales||0); }, 0);
+          var monthName = new Date(anio, mes-1).toLocaleString('es-EC', { month:'long', year:'numeric' });
+          var rows = items.map(function(r) {
+            var nombre = r.chofer ? r.chofer.nombre : (r.choferId || '-');
+            return '<tr><td>' + nombre + '</td><td style="text-align:center">' + (r.totalRegistros||0) +
+              '</td><td style="text-align:center">' + (r.totalUrbanas||0) +
+              '</td><td style="text-align:center">' + (r.totalRurales||0) +
+              '</td><td style="text-align:right;font-weight:500">' + UI.formatCurrency(r.montoTotal) + '</td></tr>';
+          }).join('');
+          el.innerHTML =
+            '<div class="cards-grid" style="margin-bottom:16px">' +
+              '<div class="stat-card"><div class="stat-label">Total Registros</div><div class="stat-value">' + totalReg + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Monto Total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Choferes con actividad</div><div class="stat-value">' + items.length + '</div></div>' +
+            '</div>' +
+            '<div class="card"><div class="card-title">Resumen por Chofer &mdash; ' + monthName + '</div>' +
+            '<div class="table-wrapper"><table>' +
+              '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Urbanas</th><th style="text-align:center">Rurales</th><th style="text-align:right">Monto</th></tr></thead>' +
+              '<tbody>' + rows + '</tbody>' +
+              '<tfoot><tr><td>TOTAL</td><td style="text-align:center">' + totalReg + '</td><td style="text-align:center">' + totalUrbanas + '</td><td style="text-align:center">' + totalRurales + '</td><td style="text-align:right">' + UI.formatCurrency(totalMonto) + '</td></tr></tfoot>' +
+            '</table></div></div>';
+        })
+        .catch(function(e) { UI.showError(el, e.message); });
+    }
+    return {
+      title: 'Reportes',
+      render: function(container) {
+        var ym = currentYearMonth();
+        container.innerHTML =
+          '<div class="card" style="margin-bottom:16px"><div class="toolbar"><div class="filter-bar">' +
+          '<select class="form-control" id="r-anio">' + yearOptions(ym.anio) + '</select>' +
+          '<select class="form-control" id="r-mes">' + monthOptions(ym.mes) + '</select>' +
+          '<button class="btn btn-primary" id="btn-generar">Generar Reporte</button>' +
+          '</div></div></div><div id="reporte-body"></div>';
+        container.querySelector('#btn-generar').onclick = function() {
+          var a = parseInt(container.querySelector('#r-anio').value);
+          var m = parseInt(container.querySelector('#r-mes').value);
+          _loadReporte(container.querySelector('#reporte-body'), a, m);
+        };
+        _loadReporte(container.querySelector('#reporte-body'), ym.anio, ym.mes);
+      }
+    };
+  }
+
+  /* ─── Tarifas ────────────────────────────────────────────────────────────── */
+  function makeTarifasPage() {
+    function _load(container) {
+      UI.showLoading(container);
+      Promise.all([API.tarifas.getActivas(), API.tarifas.getHistorial()])
+        .then(function(r) {
+          var activas = r[0], hist = r[1];
+          var actRows = activas.map(function(t) {
+            return '<tr><td>' + UI.rutaBadge(t.tipoRuta) + '</td><td><strong>' + UI.formatCurrency(t.valor) + '</strong></td><td>' + (t.descripcion||'-') + '</td><td>' + UI.formatDate(t.fechaVigencia) + '</td><td>' + UI.activoBadge(t.activo) + '</td></tr>';
+          }).join('');
+          var histRows = hist.slice(0,30).map(function(t) {
+            return '<tr><td>' + UI.rutaBadge(t.tipoRuta) + '</td><td>' + UI.formatCurrency(t.valor) + '</td><td>' + (t.descripcion||'-') + '</td><td>' + UI.formatDate(t.fechaVigencia) + '</td><td>' + (t.fechaVencimiento ? UI.formatDate(t.fechaVencimiento) : '<span style="color:var(--secondary)">Vigente</span>') + '</td></tr>';
+          }).join('');
+          container.innerHTML =
+            '<div class="toolbar"><div></div><button class="btn btn-primary" id="btn-nueva-tarifa">+ Nueva Tarifa</button></div>' +
+            '<div class="card" style="margin-bottom:16px"><div class="card-title">Tarifas Vigentes</div>' +
+            (activas.length === 0 ? '<div class="empty-state"><p>Sin tarifas activas</p></div>' :
+              '<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Valor</th><th>Descripci&#243;n</th><th>Desde</th><th>Estado</th></tr></thead><tbody>' + actRows + '</tbody></table></div>') +
+            '</div><div class="card"><div class="card-title">Historial</div>' +
+            (hist.length === 0 ? '<div class="empty-state"><p>Sin historial</p></div>' :
+              '<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Valor</th><th>Descripci&#243;n</th><th>Desde</th><th>Hasta</th></tr></thead><tbody>' + histRows + '</tbody></table></div>') +
+            '</div>';
+          container.querySelector('#btn-nueva-tarifa').onclick = function() {
+            Modal.show({ title: 'Nueva Tarifa',
+              body: '<div class="form-row"><div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="t-tipo"><option value="URBANA">Urbana</option><option value="RURAL">Rural</option></select></div><div class="form-group"><label class="form-label">Valor ($) *</label><input type="number" class="form-control" id="t-valor" step="0.01" min="0" placeholder="0.00"></div></div><div class="form-group"><label class="form-label">Descripci&#243;n *</label><input type="text" class="form-control" id="t-desc" placeholder="Ej: Tarifa urbana 2025"></div><div class="form-group"><label class="form-label">Vigencia desde</label><input type="date" class="form-control" id="t-vig" value="' + isoToday() + '"></div>',
+              onSave: function() {
+                var valor = parseFloat(Modal.val('t-valor')), desc = Modal.val('t-desc');
+                if (!desc || isNaN(valor)) { Toast.error('Completa todos los campos'); return; }
+                Modal.setLoading(true);
+                API.tarifas.crear({ tipoRuta: Modal.val('t-tipo'), valor: valor, descripcion: desc, fechaVigencia: Modal.val('t-vig') || undefined })
+                  .then(function() { Modal.hide(); Toast.success('Tarifa creada'); _load(container); })
+                  .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+              }
+            });
+          };
+        }).catch(function(e) { UI.showError(container, e.message); });
+    }
+    return { title: 'Tarifas', render: function(container) { _load(container); } };
+  }
+
+  /* ─── Choferes ───────────────────────────────────────────────────────────── */
+  function makeChoferesPage() {
+    function _load(container) {
+      UI.showLoading(container);
+      API.choferes.getAll().then(function(data) {
+        var rows = data.map(function(c) {
+          return '<tr><td><strong>' + c.nombre + '</strong></td><td>' + (c.dni||'-') + '</td><td>' + (c.telefono||'-') + '</td><td>' + UI.formatDate(c.fechaIngreso) + '</td><td>' + UI.activoBadge(c.activo) + '</td>' +
+            '<td><div class="action-btns"><button class="btn-icon" data-action="edit" data-id="' + c.choferId + '">&#9998;</button>' +
+            (c.activo ? '<button class="btn-icon" data-action="des" data-id="' + c.choferId + '">&#128683;</button>' : '') +
+            '</div></td></tr>';
+        }).join('');
+        container.innerHTML =
+          '<div class="toolbar"><div></div><button class="btn btn-primary" id="btn-nuevo-ch">+ Nuevo Chofer</button></div>' +
+          '<div class="card"><div class="card-title">Choferes (' + data.length + ')</div>' +
+          (data.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#128100;</div><p>Sin choferes</p></div>' :
+            '<div class="table-wrapper"><table><thead><tr><th>Nombre</th><th>DNI</th><th>Tel&#233;fono</th><th>Ingreso</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + rows + '</tbody></table></div>') +
+          '</div>';
+        container.querySelector('#btn-nuevo-ch').onclick = function() { _openCreate(container); };
+        container.querySelectorAll('[data-action]').forEach(function(btn) {
+          var c = data.filter(function(x) { return x.choferId === btn.dataset.id; })[0];
+          if (btn.dataset.action === 'edit') btn.onclick = function() { _openEdit(container, c); };
+          if (btn.dataset.action === 'des')  btn.onclick = function() {
+            Modal.show({ title: 'Desactivar Chofer', danger: true, saveLabel: 'Desactivar',
+              body: '<p>&#191;Desactivar a <strong>' + c.nombre + '</strong>?</p>',
+              onSave: function() {
+                Modal.setLoading(true);
+                API.choferes.desactivar(c.choferId)
+                  .then(function() { Modal.hide(); Toast.success('Chofer desactivado'); _load(container); })
+                  .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+              }
+            });
+          };
+        });
+      }).catch(function(e) { UI.showError(container, e.message); });
+    }
+
+    function _form(c) {
+      return '<div class="form-row"><div class="form-group"><label class="form-label">Nombre *</label><input type="text" class="form-control" id="ch-n" value="' + (c?c.nombre:'') + '" placeholder="Juan P&#233;rez"></div>' +
+        '<div class="form-group"><label class="form-label">DNI *</label><input type="text" class="form-control" id="ch-d" value="' + (c?(c.dni||''):'') + '" placeholder="0912345678"' + (c?' readonly':'') + '></div></div>' +
+        '<div class="form-row"><div class="form-group"><label class="form-label">Tel&#233;fono</label><input type="text" class="form-control" id="ch-t" value="' + (c?(c.telefono||''):'') + '"></div>' +
+        '<div class="form-group"><label class="form-label">Fecha Ingreso</label><input type="date" class="form-control" id="ch-f" value="' + (c&&c.fechaIngreso?c.fechaIngreso.split('T')[0]:isoToday()) + '"></div></div>' +
+        '<div class="form-group"><label class="form-label">Notas</label><textarea class="form-control" id="ch-o" rows="2">' + (c?(c.notas||''):'') + '</textarea></div>';
+    }
+
+    function _openCreate(container) {
+      Modal.show({ title: 'Nuevo Chofer', body: _form(null), onSave: function() {
+        var nombre = Modal.val('ch-n'), dni = Modal.val('ch-d');
+        if (!nombre || !dni) { Toast.error('Nombre y DNI requeridos'); return; }
+        Modal.setLoading(true);
+        API.choferes.crear({ nombre:nombre, dni:dni, telefono:Modal.val('ch-t')||undefined, fechaIngreso:Modal.val('ch-f')||undefined, notas:Modal.val('ch-o')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Chofer creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    function _openEdit(container, c) {
+      Modal.show({ title: 'Editar Chofer', body: _form(c), onSave: function() {
+        Modal.setLoading(true);
+        API.choferes.actualizar(c.choferId, { nombre:Modal.val('ch-n')||undefined, telefono:Modal.val('ch-t')||undefined, notas:Modal.val('ch-o')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Chofer actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    return { title: 'Choferes', render: function(container) { _load(container); } };
+  }
+
+  /* ─── Camiones ───────────────────────────────────────────────────────────── */
+  function makeCamionesPage() {
+    var _choferes = [];
+    function _load(container) {
+      UI.showLoading(container);
+      Promise.all([API.camiones.getAll(), API.choferes.getAll()]).then(function(r) {
+        _choferes = r[1];
+        var data = r[0];
+        var rows = data.map(function(c) {
+          return '<tr><td><strong>' + c.patente + '</strong></td><td>' + (c.modelo||'-') + '</td><td>' + (c.anio||'-') + '</td><td>' + UI.choferName(_choferes, c.choferId) + '</td><td>' + UI.activoBadge(c.activo) + '</td>' +
+            '<td><div class="action-btns"><button class="btn-icon" data-action="edit" data-id="' + c.camionId + '">&#9998;</button>' +
+            (c.activo ? '<button class="btn-icon" data-action="des" data-id="' + c.camionId + '">&#128683;</button>' : '') +
+            '</div></td></tr>';
+        }).join('');
+        container.innerHTML =
+          '<div class="toolbar"><div></div><button class="btn btn-primary" id="btn-nuevo-ca">+ Nuevo Cami&#243;n</button></div>' +
+          '<div class="card"><div class="card-title">Camiones (' + data.length + ')</div>' +
+          (data.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#128667;</div><p>Sin camiones</p></div>' :
+            '<div class="table-wrapper"><table><thead><tr><th>Patente</th><th>Modelo</th><th>A&#241;o</th><th>Chofer</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' + rows + '</tbody></table></div>') +
+          '</div>';
+        container.querySelector('#btn-nuevo-ca').onclick = function() { _openCreate(container); };
+        container.querySelectorAll('[data-action]').forEach(function(btn) {
+          var c = data.filter(function(x) { return x.camionId === btn.dataset.id; })[0];
+          if (btn.dataset.action === 'edit') btn.onclick = function() { _openEdit(container, c); };
+          if (btn.dataset.action === 'des')  btn.onclick = function() {
+            Modal.show({ title: 'Desactivar Cami&#243;n', danger: true, saveLabel: 'Desactivar',
+              body: '<p>&#191;Desactivar el cami&#243;n <strong>' + c.patente + '</strong>?</p>',
+              onSave: function() {
+                Modal.setLoading(true);
+                API.camiones.desactivar(c.camionId)
+                  .then(function() { Modal.hide(); Toast.success('Cami\u00f3n desactivado'); _load(container); })
+                  .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+              }
+            });
+          };
+        });
+      }).catch(function(e) { UI.showError(container, e.message); });
+    }
+
+    function _form(c) {
+      return '<div class="form-row"><div class="form-group"><label class="form-label">Patente *</label><input type="text" class="form-control" id="ca-p" value="' + (c?c.patente:'') + '" placeholder="ABC-1234"' + (c?' readonly':'') + '></div>' +
+        '<div class="form-group"><label class="form-label">A&#241;o</label><input type="number" class="form-control" id="ca-a" value="' + (c?(c.anio||''):'') + '" min="1990" max="2035"></div></div>' +
+        '<div class="form-row"><div class="form-group"><label class="form-label">Modelo</label><input type="text" class="form-control" id="ca-m" value="' + (c?(c.modelo||''):'') + '" placeholder="Hino 500"></div>' +
+        '<div class="form-group"><label class="form-label">Chofer Asignado *</label><select class="form-control" id="ca-c">' + UI.choferOptions(_choferes, c?c.choferId:'') + '</select></div></div>' +
+        '<div class="form-group"><label class="form-label">Notas</label><textarea class="form-control" id="ca-o" rows="2">' + (c?(c.notas||''):'') + '</textarea></div>';
+    }
+
+    function _openCreate(container) {
+      Modal.show({ title: 'Nuevo Cami\u00f3n', body: _form(null), onSave: function() {
+        var patente = Modal.val('ca-p'), choferId = Modal.val('ca-c');
+        if (!patente || !choferId) { Toast.error('Patente y chofer requeridos'); return; }
+        Modal.setLoading(true);
+        var anioStr = Modal.val('ca-a');
+        API.camiones.crear({ patente:patente, modelo:Modal.val('ca-m')||undefined, anio:anioStr?parseInt(anioStr):undefined, choferId:choferId, notas:Modal.val('ca-o')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Cami\u00f3n creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    function _openEdit(container, c) {
+      Modal.show({ title: 'Editar Cami\u00f3n', body: _form(c), onSave: function() {
+        Modal.setLoading(true);
+        var anioStr = Modal.val('ca-a');
+        API.camiones.actualizar(c.camionId, { modelo:Modal.val('ca-m')||undefined, anio:anioStr?parseInt(anioStr):undefined, choferId:Modal.val('ca-c')||undefined, notas:Modal.val('ca-o')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Cami\u00f3n actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    return { title: 'Camiones', render: function(container) { _load(container); } };
+  }
+
+  /* ─── Usuarios ───────────────────────────────────────────────────────────── */
+  function makeUsuariosPage() {
+    var _choferes = [];
+    function _load(container) {
+      UI.showLoading(container);
+      Promise.all([API.usuarios.getAll(), API.choferes.getAll()]).then(function(r) {
+        _choferes = r[1];
+        var data = r[0];
+        var rows = data.map(function(u) {
+          return '<tr><td>' + u.correo + '</td><td><span class="badge badge-' + (u.rol||'').toLowerCase() + '">' + (u.rol||'-') + '</span></td><td>' + (u.choferId ? UI.choferName(_choferes, u.choferId) : '-') + '</td><td>' + UI.activoBadge(u.activo) + '</td><td>' + UI.formatDateTime(u.ultimoAcceso) + '</td>' +
+            '<td><div class="action-btns"><button class="btn-icon" data-action="edit" data-id="' + u.usuarioId + '">&#9998;</button>' +
+            (u.activo ? '<button class="btn-icon" data-action="des" data-id="' + u.usuarioId + '">&#128683;</button>' : '') +
+            '</div></td></tr>';
+        }).join('');
+        container.innerHTML =
+          '<div class="toolbar"><div></div><button class="btn btn-primary" id="btn-nuevo-us">+ Nuevo Usuario</button></div>' +
+          '<div class="card"><div class="card-title">Usuarios (' + data.length + ')</div>' +
+          (data.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#9881;</div><p>Sin usuarios</p></div>' :
+            '<div class="table-wrapper"><table><thead><tr><th>Correo</th><th>Rol</th><th>Chofer</th><th>Estado</th><th>&#218;lt. Acceso</th><th>Acciones</th></tr></thead><tbody>' + rows + '</tbody></table></div>') +
+          '</div>';
+        container.querySelector('#btn-nuevo-us').onclick = function() { _openCreate(container); };
+        container.querySelectorAll('[data-action]').forEach(function(btn) {
+          var u = data.filter(function(x) { return x.usuarioId === btn.dataset.id; })[0];
+          if (btn.dataset.action === 'edit') btn.onclick = function() { _openEdit(container, u); };
+          if (btn.dataset.action === 'des')  btn.onclick = function() {
+            Modal.show({ title: 'Desactivar Usuario', danger: true, saveLabel: 'Desactivar',
+              body: '<p>&#191;Desactivar a <strong>' + u.correo + '</strong>?</p>',
+              onSave: function() {
+                Modal.setLoading(true);
+                API.usuarios.desactivar(u.usuarioId)
+                  .then(function() { Modal.hide(); Toast.success('Usuario desactivado'); _load(container); })
+                  .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+              }
+            });
+          };
+        });
+      }).catch(function(e) { UI.showError(container, e.message); });
+    }
+
+    function _form(u) {
+      var chOpts = '<option value="">Sin vinculaci\u00f3n</option>' +
+        _choferes.map(function(c) { return '<option value="' + c.choferId + '"' + (u&&u.choferId===c.choferId?' selected':'') + '>' + c.nombre + '</option>'; }).join('');
+      return '<div class="form-group"><label class="form-label">Correo Gmail *</label><input type="email" class="form-control" id="us-c" value="' + (u?u.correo:'') + '" placeholder="usuario@gmail.com"' + (u?' readonly':'') + '></div>' +
+        '<div class="form-row"><div class="form-group"><label class="form-label">Rol *</label><select class="form-control" id="us-r"><option value="CHOFER"' + (!u||u.rol==='CHOFER'?' selected':'') + '>Chofer</option><option value="ADMIN"' + (u&&u.rol==='ADMIN'?' selected':'') + '>Admin</option></select></div>' +
+        '<div class="form-group"><label class="form-label">Chofer Vinculado</label><select class="form-control" id="us-ch">' + chOpts + '</select></div></div>';
+    }
+
+    function _openCreate(container) {
+      Modal.show({ title: 'Nuevo Usuario', body: _form(null), onSave: function() {
+        var correo = Modal.val('us-c');
+        if (!correo) { Toast.error('El correo es requerido'); return; }
+        Modal.setLoading(true);
+        API.usuarios.crear({ correo:correo, rol:Modal.val('us-r'), choferId:Modal.val('us-ch')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Usuario creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    function _openEdit(container, u) {
+      Modal.show({ title: 'Editar Usuario', body: _form(u), onSave: function() {
+        Modal.setLoading(true);
+        API.usuarios.actualizar(u.usuarioId, { rol:Modal.val('us-r')||undefined, choferId:Modal.val('us-ch')||undefined })
+          .then(function() { Modal.hide(); Toast.success('Usuario actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }});
+    }
+
+    return { title: 'Usuarios', render: function(container) { _load(container); } };
+  }
+
+  /* ─── Auditoría ──────────────────────────────────────────────────────────── */
+  function makeAuditoriaPage() {
+    function _load(container, emailFiltro) {
+      UI.showLoading(container);
+      (emailFiltro ? API.auditoria.byUsuario(emailFiltro) : API.auditoria.getAll())
+        .then(function(data) {
+          var rows = data.slice(0,100).map(function(a) {
+            var ok = a.resultado === 'EXITO';
+            return '<tr><td>' + UI.formatDateTime(a.timestamp) + '</td><td>' + (a.usuarioEmail||'-') +
+              '</td><td><span class="badge">' + (a.accion||'-') + '</span></td><td>' + (a.entidad||'-') +
+              '</td><td><span class="badge ' + (ok?'badge-activo':'badge-inactivo') + '">' + (a.resultado||'-') + '</span></td>' +
+              '<td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (a.detalle||'') + '">' + (a.detalle||'-') + '</td></tr>';
+          }).join('');
+          container.innerHTML =
+            '<div class="card" style="margin-bottom:16px"><div class="toolbar"><div class="filter-bar">' +
+            '<input type="email" class="form-control" id="au-e" value="' + (emailFiltro||'') + '" placeholder="Filtrar por correo">' +
+            '<button class="btn btn-secondary" id="btn-au-f">Filtrar</button>' +
+            '<button class="btn btn-secondary" id="btn-au-l">Ver todos</button>' +
+            '</div></div></div>' +
+            '<div class="card"><div class="card-title">Auditor&#237;a (' + (data.length > 100 ? '100+ registros' : data.length) + ')</div>' +
+            (data.length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#128269;</div><p>Sin registros</p></div>' :
+              '<div class="table-wrapper"><table><thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Acci&#243;n</th><th>Entidad</th><th>Resultado</th><th>Detalle</th></tr></thead><tbody>' + rows + '</tbody></table></div>') +
+            '</div>';
+          container.querySelector('#btn-au-f').onclick = function() {
+            var e = container.querySelector('#au-e').value.trim();
+            _load(container, e || null);
+          };
+          container.querySelector('#btn-au-l').onclick = function() { _load(container, null); };
+        }).catch(function(e) { UI.showError(container, e.message); });
+    }
+    return { title: 'Auditor\u00eda', render: function(container) { _load(container, null); } };
+  }
+
+  /* ─── Bootstrap ──────────────────────────────────────────────────────────── */
+  document.addEventListener('DOMContentLoaded', function() {
+    var session = window.__SESSION__;
+
+    if (!session) {
+      var tplNA = document.getElementById('tpl-no-access');
+      document.getElementById('app').innerHTML = '';
+      document.getElementById('app').appendChild(tplNA.content.cloneNode(true));
+      return;
+    }
+
+    var tpl = document.getElementById('tpl-layout');
+    document.getElementById('app').innerHTML = '';
+    document.getElementById('app').appendChild(tpl.content.cloneNode(true));
+
+    document.getElementById('app-nombre').textContent = window.__APP_NOMBRE__ || 'Sistema';
+    document.getElementById('sidebar-user-email').textContent = session.email || '';
+    document.getElementById('topbar-user').textContent = session.email || '';
+    var rol = session.rol || '';
+    document.getElementById('topbar-role').textContent = rol;
+    document.getElementById('topbar-role').className = 'badge badge-' + rol.toLowerCase();
+
+    document.getElementById('btn-logout').addEventListener('click', function() {
+      if (confirm('&#191;Desea cerrar la aplicaci&#243;n?')) window.close();
+    });
+    document.getElementById('sidebar-toggle').addEventListener('click', function() {
+      document.getElementById('sidebar').classList.toggle('open');
+    });
+
+    buildMenu(session);
+    registerRoutes(session);
+    Router.start();
+  });
+
+  function buildMenu(session) {
+    var nav = document.getElementById('sidebar-nav');
+    var isAdmin = session.rol === 'ADMIN';
+    var html = '<div class="nav-section">General</div>';
+    [
+      { route: 'dashboard', icon: '&#128202;', label: 'Dashboard' },
+      { route: 'registros', icon: '&#128203;', label: 'Registros' },
+      { route: 'reportes',  icon: '&#128200;', label: 'Reportes'  },
+    ].forEach(function(i) {
+      html += '<div class="nav-item" data-route="' + i.route + '" onclick="Router.navigate(\'' + i.route + '\')"><span class="nav-icon">' + i.icon + '</span>' + i.label + '</div>';
+    });
+    if (isAdmin) {
+      html += '<div class="nav-section">Administraci\u00f3n</div>';
+      [
+        { route: 'tarifas',   icon: '&#36;',     label: 'Tarifas'    },
+        { route: 'choferes',  icon: '&#128100;', label: 'Choferes'   },
+        { route: 'camiones',  icon: '&#128667;', label: 'Camiones'   },
+        { route: 'usuarios',  icon: '&#9881;',   label: 'Usuarios'   },
+        { route: 'auditoria', icon: '&#128269;', label: 'Auditor\u00eda' },
+      ].forEach(function(i) {
+        html += '<div class="nav-item" data-route="' + i.route + '" onclick="Router.navigate(\'' + i.route + '\')"><span class="nav-icon">' + i.icon + '</span>' + i.label + '</div>';
+      });
+    }
+    nav.innerHTML = html;
+  }
+
+  function registerRoutes(session) {
+    Router.register('dashboard', makeDashboardPage());
+    Router.register('registros', makeRegistrosPage(session));
+    Router.register('reportes',  makeReportesPage());
+    Router.register('tarifas',   makeTarifasPage());
+    Router.register('choferes',  makeChoferesPage());
+    Router.register('camiones',  makeCamionesPage());
+    Router.register('usuarios',  makeUsuariosPage());
+    Router.register('auditoria', makeAuditoriaPage());
+  }
+  </script>
+</body>
+</html>

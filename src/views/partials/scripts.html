@@ -1,0 +1,1288 @@
+<script>
+/* ─── API Client ─────────────────────────────────────────────────────────────
+ * Wrapper sobre google.script.run para comunicación con el backend GAS.
+ */
+const API = {
+  call(action, payload = {}) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(res => {
+          const parsed = typeof res === 'string' ? JSON.parse(res) : res;
+          if (parsed.success) resolve(parsed.data);
+          else reject(new Error(parsed.error));
+        })
+        .withFailureHandler(err => reject(new Error(err.message)))
+        .doPost({ postData: { contents: JSON.stringify({ action, payload }) } });
+    });
+  },
+
+  registros: {
+    getAll:    ()        => API.call('registros.getAll'),
+    filtrar:   (f)       => API.call('registros.filtrar', f),
+    crear:     (dto)     => API.call('registros.crear', dto),
+    actualizar:(id, dto) => API.call('registros.actualizar', { id, ...dto }),
+    validar:   (dto)     => API.call('registros.validar', dto),
+    eliminar:  (id)      => API.call('registros.eliminar', { id }),
+  },
+
+  choferes: {
+    getAll:    ()        => API.call('choferes.getAll'),
+    crear:     (dto)     => API.call('choferes.crear', dto),
+    actualizar:(id, dto) => API.call('choferes.actualizar', { id, ...dto }),
+    desactivar:(id)      => API.call('choferes.desactivar', { id }),
+  },
+
+  camiones: {
+    getAll:    ()        => API.call('camiones.getAll'),
+    crear:     (dto)     => API.call('camiones.crear', dto),
+    actualizar:(id, dto) => API.call('camiones.actualizar', { id, ...dto }),
+    desactivar:(id)      => API.call('camiones.desactivar', { id }),
+  },
+
+  tarifas: {
+    getActivas:  ()      => API.call('tarifas.getActivas'),
+    getHistorial:()      => API.call('tarifas.getHistorial'),
+    crear:       (dto)   => API.call('tarifas.crear', dto),
+  },
+
+  reportes: {
+    resumenPeriodo:(filtro)            => API.call('reportes.resumenPeriodo', filtro),
+    reporteChofer: (choferId, filtro)  => API.call('reportes.reporteChofer', { choferId, ...filtro }),
+  },
+
+  usuarios: {
+    getAll:    ()        => API.call('usuarios.getAll'),
+    getSelf:   ()        => API.call('usuarios.getSelf'),
+    crear:     (dto)     => API.call('usuarios.crear', dto),
+    actualizar:(id, dto) => API.call('usuarios.actualizar', { id, ...dto }),
+    desactivar:(id)      => API.call('usuarios.desactivar', { id }),
+  },
+
+  auditoria: {
+    getAll:   ()       => API.call('auditoria.getAll'),
+    byUsuario:(email)  => API.call('auditoria.getByUsuario', { email }),
+  },
+};
+
+/* ─── Router SPA ─────────────────────────────────────────────────────────────
+ * Navegación por hash: #dashboard, #registros, etc.
+ */
+const Router = {
+  routes: {},
+  register(path, renderer) { this.routes[path] = renderer; },
+  navigate(path) { window.location.hash = path; },
+  start() {
+    window.addEventListener('hashchange', () => this._render());
+    this._render();
+  },
+  _render() {
+    const path = window.location.hash.slice(1) || 'dashboard';
+    const renderer = this.routes[path];
+    const content = document.getElementById('content');
+    if (!content) return;
+    if (renderer) {
+      document.getElementById('page-title').textContent = renderer.title || path;
+      document.querySelectorAll('.nav-item').forEach(el =>
+        el.classList.toggle('active', el.dataset.route === path));
+      renderer.render(content);
+    } else {
+      content.innerHTML = `<div class="card"><p>Página no encontrada: ${path}</p></div>`;
+    }
+  },
+};
+
+/* ─── Toast ──────────────────────────────────────────────────────────────────*/
+const Toast = {
+  _c: null,
+  _container() {
+    if (!this._c) {
+      this._c = document.createElement('div');
+      this._c.className = 'toast-container';
+      document.body.appendChild(this._c);
+    }
+    return this._c;
+  },
+  show(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast toast-${type}`;
+    el.textContent = msg;
+    this._container().appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+  },
+  success(msg) { this.show(msg, 'success'); },
+  error(msg)   { this.show(msg, 'error'); },
+  info(msg)    { this.show(msg, 'info'); },
+};
+
+/* ─── Modal ──────────────────────────────────────────────────────────────────*/
+const Modal = {
+  _el: null,
+  show({ title, body, onSave, saveLabel = 'Guardar', danger = false }) {
+    if (this._el) this._el.remove();
+    this._el = document.createElement('div');
+    this._el.className = 'modal-overlay';
+    this._el.innerHTML = `
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <span class="modal-title">${title}</span>
+          <button class="modal-close" type="button">&times;</button>
+        </div>
+        <div class="modal-body">${body}</div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary modal-cancel" type="button">Cancelar</button>
+          ${onSave ? `<button class="btn ${danger ? 'btn-danger' : 'btn-primary'} modal-save" type="button">${saveLabel}</button>` : ''}
+        </div>
+      </div>`;
+    document.body.appendChild(this._el);
+    this._el.querySelector('.modal-close').onclick  = () => this.hide();
+    this._el.querySelector('.modal-cancel').onclick = () => this.hide();
+    if (onSave) this._el.querySelector('.modal-save').onclick = onSave;
+    this._el.onclick = e => { if (e.target === this._el) this.hide(); };
+  },
+  hide() { if (this._el) { this._el.remove(); this._el = null; } },
+  val(id) {
+    const el = this._el && this._el.querySelector('#' + id);
+    return el ? el.value.trim() : '';
+  },
+  setLoading(on) {
+    const btn = this._el && this._el.querySelector('.modal-save');
+    if (btn) { btn.disabled = on; btn.textContent = on ? 'Guardando...' : btn.dataset.label || 'Guardar'; }
+  },
+};
+
+/* ─── UI Helpers ─────────────────────────────────────────────────────────────*/
+const UI = {
+  toast: (msg, type) => Toast.show(msg, type),
+
+  showLoading(container, msg = 'Cargando...') {
+    container.innerHTML = `<div class="empty-state"><div class="loading-spinner"></div><p>${msg}</p></div>`;
+  },
+
+  showError(container, msg) {
+    container.innerHTML = `<div class="empty-state"><p style="color:var(--danger)">&#9888; ${msg}</p></div>`;
+  },
+
+  formatCurrency(amount) {
+    return '$' + Number(amount || 0).toFixed(2);
+  },
+
+  formatDate(val) {
+    if (!val) return '-';
+    const s = typeof val === 'string' ? val : new Date(val).toISOString();
+    const parts = s.split('T')[0].split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  },
+
+  formatDateTime(val) {
+    if (!val) return '-';
+    try {
+      return new Date(val).toLocaleString('es-EC', {
+        timeZone: 'America/Guayaquil',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch (e) { return String(val); }
+  },
+
+  statusBadge(estado) {
+    const map = { PENDIENTE: 'status-pendiente', VALIDADO: 'status-validado', RECHAZADO: 'status-rechazado' };
+    return `<span class="status ${map[estado] || ''}">${estado || '-'}</span>`;
+  },
+
+  activoBadge(activo) {
+    return activo
+      ? '<span class="badge badge-activo">Activo</span>'
+      : '<span class="badge badge-inactivo">Inactivo</span>';
+  },
+
+  rutaBadge(tipo) {
+    if (!tipo) return '-';
+    return `<span class="badge badge-${tipo.toLowerCase()}">${tipo}</span>`;
+  },
+
+  choferName(choferes, id) {
+    const c = choferes.find(x => x.choferId === id);
+    return c ? c.nombre : (id || '-');
+  },
+
+  camionPatente(camiones, id) {
+    const c = camiones.find(x => x.camionId === id);
+    return c ? c.patente : (id || '-');
+  },
+
+  choferOptions(choferes, selected = '') {
+    return choferes
+      .filter(c => c.activo)
+      .map(c => `<option value="${c.choferId}" ${c.choferId === selected ? 'selected' : ''}>${c.nombre}</option>`)
+      .join('');
+  },
+
+  camionOptions(camiones, selected = '') {
+    return camiones
+      .filter(c => c.activo)
+      .map(c => `<option value="${c.camionId}" ${c.camionId === selected ? 'selected' : ''}>${c.patente} &mdash; ${c.modelo}</option>`)
+      .join('');
+  },
+};
+
+/* ─── Utilidades ─────────────────────────────────────────────────────────────*/
+function currentYearMonth() {
+  const d = new Date();
+  return { anio: d.getFullYear(), mes: d.getMonth() + 1 };
+}
+
+function isoToday() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function monthOptions(selected) {
+  const names = ['Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                  'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return names.map((n, i) =>
+    `<option value="${i+1}" ${i+1 === selected ? 'selected' : ''}>${n}</option>`
+  ).join('');
+}
+
+function yearOptions(selected) {
+  const cur = new Date().getFullYear();
+  let html = '';
+  for (let y = cur; y >= cur - 3; y--)
+    html += `<option value="${y}" ${y === selected ? 'selected' : ''}>${y}</option>`;
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════ */
+/*  PÁGINAS                                                                    */
+/* ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Dashboard ──────────────────────────────────────────────────────────────*/
+function makeDashboardPage() {
+  return {
+    title: 'Dashboard',
+    render(container) {
+      UI.showLoading(container);
+      const { anio, mes } = currentYearMonth();
+      Promise.all([
+        API.choferes.getAll(),
+        API.camiones.getAll(),
+        API.registros.filtrar({ anio, mes }),
+      ]).then(function(results) {
+        const choferes = results[0];
+        const camiones = results[1];
+        const registros = results[2];
+
+        const actChoferes = choferes.filter(c => c.activo).length;
+        const actCamiones = camiones.filter(c => c.activo).length;
+        const totalMonto  = registros.reduce((s, r) => s + (r.tarifaAplicada || 0), 0);
+        const pendientes  = registros.filter(r => r.estado === 'PENDIENTE').length;
+        const monthName   = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+
+        const recentRows = registros.slice(0, 10).map(r =>
+          `<tr>
+            <td>${UI.formatDate(r.fecha)}</td>
+            <td>${UI.choferName(choferes, r.choferId)}</td>
+            <td>${UI.camionPatente(camiones, r.camionId)}</td>
+            <td>${UI.rutaBadge(r.tipoRuta)}</td>
+            <td>${UI.formatCurrency(r.tarifaAplicada)}</td>
+            <td>${UI.statusBadge(r.estado)}</td>
+          </tr>`
+        ).join('');
+
+        container.innerHTML = `
+          <div class="cards-grid">
+            <div class="stat-card">
+              <div class="stat-label">Registros del mes</div>
+              <div class="stat-value">${registros.length}</div>
+              <div class="stat-sub">${monthName}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Monto total del mes</div>
+              <div class="stat-value" style="font-size:22px">${UI.formatCurrency(totalMonto)}</div>
+              <div class="stat-sub">${monthName}</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Choferes activos</div>
+              <div class="stat-value">${actChoferes}</div>
+              <div class="stat-sub">de ${choferes.length} total</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Camiones activos</div>
+              <div class="stat-value">${actCamiones}</div>
+              <div class="stat-sub">de ${camiones.length} total</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Pendientes de validar</div>
+              <div class="stat-value" style="color:var(--warning)">${pendientes}</div>
+              <div class="stat-sub">del mes actual</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title">&#218;ltimos registros del mes</div>
+            ${registros.length === 0
+              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros este mes</p></div>'
+              : `<div class="table-wrapper"><table>
+                  <thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead>
+                  <tbody>${recentRows}</tbody>
+                 </table></div>`
+            }
+          </div>`;
+      }).catch(err => UI.showError(container, err.message));
+    }
+  };
+}
+
+/* ─── Registros ──────────────────────────────────────────────────────────────*/
+function makeRegistrosPage(session) {
+  const isAdmin = session.rol === 'ADMIN';
+  let _choferes = [], _camiones = [], _data = [], _filtro = {};
+
+  return {
+    title: 'Registros',
+    render(container) { _load(container, {}); }
+  };
+
+  function _load(container, filtro) {
+    _filtro = filtro || {};
+    UI.showLoading(container);
+    Promise.all([API.choferes.getAll(), API.camiones.getAll()])
+      .then(function(r) {
+        _choferes = r[0]; _camiones = r[1];
+        return API.registros.filtrar(_filtro);
+      })
+      .then(function(data) { _data = data; _renderPage(container); })
+      .catch(err => UI.showError(container, err.message));
+  }
+
+  function _renderPage(container) {
+    const choferOpts = '<option value="">Todos los choferes</option>' +
+      _choferes.map(c =>
+        `<option value="${c.choferId}" ${_filtro.choferId === c.choferId ? 'selected' : ''}>${c.nombre}</option>`
+      ).join('');
+
+    const rows = _data.map(function(r) {
+      const canEdit = isAdmin || r.choferId === session.choferId;
+      return `<tr>
+        <td>${UI.formatDate(r.fecha)}</td>
+        <td>${UI.choferName(_choferes, r.choferId)}</td>
+        <td>${UI.camionPatente(_camiones, r.camionId)}</td>
+        <td>${UI.rutaBadge(r.tipoRuta)}</td>
+        <td>${UI.formatCurrency(r.tarifaAplicada)}</td>
+        <td>${UI.statusBadge(r.estado)}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observaciones || '-'}</td>
+        <td>
+          <div class="action-btns">
+            ${canEdit && r.estado === 'PENDIENTE' ? `<button class="btn-icon" data-action="edit" data-id="${r.registroId}" title="Editar">&#9998;</button>` : ''}
+            ${isAdmin && r.estado === 'PENDIENTE' ? `<button class="btn-icon" data-action="validar" data-id="${r.registroId}" title="Validar">&#10003;</button>` : ''}
+            ${isAdmin && r.estado === 'PENDIENTE' ? `<button class="btn-icon" data-action="rechazar" data-id="${r.registroId}" title="Rechazar">&#10005;</button>` : ''}
+            ${isAdmin ? `<button class="btn-icon" data-action="delete" data-id="${r.registroId}" title="Eliminar">&#128465;</button>` : ''}
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    container.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="toolbar">
+          <div class="filter-bar">
+            <input type="date" class="form-control" id="f-desde" value="${_filtro.fechaDesde || ''}">
+            <input type="date" class="form-control" id="f-hasta" value="${_filtro.fechaHasta || ''}">
+            <select class="form-control" id="f-chofer">${choferOpts}</select>
+            <select class="form-control" id="f-estado">
+              <option value="">Todos los estados</option>
+              <option value="PENDIENTE" ${_filtro.estado === 'PENDIENTE' ? 'selected' : ''}>Pendiente</option>
+              <option value="VALIDADO"  ${_filtro.estado === 'VALIDADO'  ? 'selected' : ''}>Validado</option>
+              <option value="RECHAZADO" ${_filtro.estado === 'RECHAZADO' ? 'selected' : ''}>Rechazado</option>
+            </select>
+            <button class="btn btn-secondary" id="btn-filtrar">Filtrar</button>
+            <button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>
+          </div>
+          <button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Registros (${_data.length})</div>
+        ${_data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para los filtros seleccionados</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Obs.</th><th>Acciones</th></tr></thead>
+              <tbody>${rows}</tbody>
+             </table></div>`
+        }
+      </div>`;
+
+    container.querySelector('#btn-filtrar').onclick = function() {
+      _load(container, {
+        fechaDesde: container.querySelector('#f-desde').value || undefined,
+        fechaHasta: container.querySelector('#f-hasta').value || undefined,
+        choferId:   container.querySelector('#f-chofer').value || undefined,
+        estado:     container.querySelector('#f-estado').value || undefined,
+      });
+    };
+    container.querySelector('#btn-limpiar').onclick = function() { _load(container, {}); };
+    container.querySelector('#btn-nuevo-reg').onclick = function() { _openCreateModal(container); };
+
+    container.querySelectorAll('[data-action]').forEach(function(btn) {
+      btn.onclick = function() {
+        const id = btn.dataset.id;
+        const r  = _data.find(x => x.registroId === id);
+        if (btn.dataset.action === 'edit')    _openEditModal(container, r);
+        if (btn.dataset.action === 'validar') _confirmValidar(container, id, 'VALIDADO');
+        if (btn.dataset.action === 'rechazar')_confirmValidar(container, id, 'RECHAZADO');
+        if (btn.dataset.action === 'delete')  _confirmDelete(container, id);
+      };
+    });
+  }
+
+  function _registroForm(r) {
+    const chSel = r ? UI.choferOptions(_choferes, r.choferId) : UI.choferOptions(_choferes);
+    const caSel = r ? UI.camionOptions(_camiones, r.camionId) : UI.camionOptions(_camiones);
+    const tipoU = !r || r.tipoRuta === 'URBANA';
+    return `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Fecha *</label>
+          <input type="date" class="form-control" id="m-fecha" value="${r ? (r.fecha || '').split('T')[0] : isoToday()}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Tipo de Ruta *</label>
+          <select class="form-control" id="m-tipo">
+            <option value="URBANA" ${tipoU ? 'selected' : ''}>Urbana</option>
+            <option value="RURAL"  ${!tipoU ? 'selected' : ''}>Rural</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Chofer *</label>
+          <select class="form-control" id="m-chofer" ${r ? 'disabled' : ''}>${chSel}</select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cami&#243;n *</label>
+          <select class="form-control" id="m-camion" ${r ? 'disabled' : ''}>${caSel}</select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observaciones</label>
+        <textarea class="form-control" id="m-obs" rows="2">${r ? (r.observaciones || '') : ''}</textarea>
+      </div>`;
+  }
+
+  function _openCreateModal(container) {
+    Modal.show({
+      title: 'Nuevo Registro',
+      body: _registroForm(null),
+      onSave: function() {
+        const fecha    = Modal.val('m-fecha');
+        const choferId = Modal.val('m-chofer');
+        const camionId = Modal.val('m-camion');
+        const tipoRuta = Modal.val('m-tipo');
+        const obs      = Modal.val('m-obs');
+        if (!fecha || !choferId || !camionId) { Toast.error('Completa todos los campos requeridos'); return; }
+        Modal.setLoading(true);
+        API.registros.crear({ fecha, choferId, camionId, tipoRuta, observaciones: obs || undefined, origen: 'MANUAL' })
+          .then(function() { Modal.hide(); Toast.success('Registro creado'); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _openEditModal(container, r) {
+    Modal.show({
+      title: 'Editar Registro',
+      body: _registroForm(r),
+      onSave: function() {
+        const dto = {
+          fecha:        Modal.val('m-fecha')   || undefined,
+          tipoRuta:     Modal.val('m-tipo')    || undefined,
+          observaciones:Modal.val('m-obs')     || undefined,
+        };
+        Modal.setLoading(true);
+        API.registros.actualizar(r.registroId, dto)
+          .then(function() { Modal.hide(); Toast.success('Registro actualizado'); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _confirmValidar(container, id, estado) {
+    const label = estado === 'VALIDADO' ? 'Validar' : 'Rechazar';
+    Modal.show({
+      title: label + ' Registro',
+      body: `<p>&#191;Confirmar ${label.toLowerCase()} este registro?</p>
+             <div class="form-group" style="margin-top:12px">
+               <label class="form-label">Motivo (opcional)</label>
+               <input type="text" class="form-control" id="m-motivo" placeholder="Motivo...">
+             </div>`,
+      saveLabel: label,
+      danger: estado === 'RECHAZADO',
+      onSave: function() {
+        Modal.setLoading(true);
+        const motivo = Modal.val('m-motivo');
+        API.registros.validar({ registroId: id, estado, motivo: motivo || undefined })
+          .then(function() { Modal.hide(); Toast.success('Registro ' + estado.toLowerCase()); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _confirmDelete(container, id) {
+    Modal.show({
+      title: 'Eliminar Registro',
+      body: '<p>&#191;Est&#225;s seguro? Esta acci&#243;n no se puede deshacer.</p>',
+      saveLabel: 'Eliminar', danger: true,
+      onSave: function() {
+        Modal.setLoading(true);
+        API.registros.eliminar(id)
+          .then(function() { Modal.hide(); Toast.success('Registro eliminado'); _load(container, _filtro); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+}
+
+/* ─── Reportes ───────────────────────────────────────────────────────────────*/
+function makeReportesPage() {
+  return {
+    title: 'Reportes',
+    render(container) {
+      const { anio, mes } = currentYearMonth();
+      _renderControls(container, anio, mes);
+      _loadReporte(container.querySelector('#reporte-body'), anio, mes);
+    }
+  };
+
+  function _renderControls(container, anio, mes) {
+    container.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="toolbar">
+          <div class="filter-bar">
+            <select class="form-control" id="r-anio">${yearOptions(anio)}</select>
+            <select class="form-control" id="r-mes">${monthOptions(mes)}</select>
+            <button class="btn btn-primary" id="btn-generar">Generar Reporte</button>
+          </div>
+        </div>
+      </div>
+      <div id="reporte-body"></div>`;
+
+    container.querySelector('#btn-generar').onclick = function() {
+      const a = parseInt(container.querySelector('#r-anio').value);
+      const m = parseInt(container.querySelector('#r-mes').value);
+      _loadReporte(container.querySelector('#reporte-body'), a, m);
+    };
+  }
+
+  function _loadReporte(el, anio, mes) {
+    UI.showLoading(el);
+    API.reportes.resumenPeriodo({ anio, mes })
+      .then(function(data) { _renderReporte(el, data, anio, mes); })
+      .catch(function(e) { UI.showError(el, e.message); });
+  }
+
+  function _renderReporte(el, data, anio, mes) {
+    const items = Array.isArray(data) ? data : (data ? [data] : []);
+    if (items.length === 0) {
+      el.innerHTML = '<div class="card"><div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>Sin datos para el per&#237;odo seleccionado</p></div></div>';
+      return;
+    }
+    const totalMonto   = items.reduce((s, r) => s + (r.montoTotal || 0), 0);
+    const totalReg     = items.reduce((s, r) => s + (r.totalRegistros || 0), 0);
+    const totalUrbanas = items.reduce((s, r) => s + (r.totalUrbanas || 0), 0);
+    const totalRurales = items.reduce((s, r) => s + (r.totalRurales || 0), 0);
+    const monthName    = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+
+    const rows = items.map(r =>
+      `<tr>
+        <td>${r.chofer ? r.chofer.nombre : (r.choferId || '-')}</td>
+        <td style="text-align:center">${r.totalRegistros || 0}</td>
+        <td style="text-align:center">${r.totalUrbanas || 0}</td>
+        <td style="text-align:center">${r.totalRurales || 0}</td>
+        <td style="text-align:right;font-weight:500">${UI.formatCurrency(r.montoTotal)}</td>
+      </tr>`
+    ).join('');
+
+    el.innerHTML = `
+      <div class="cards-grid" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-label">Total Registros</div>
+          <div class="stat-value">${totalReg}</div>
+          <div class="stat-sub">${monthName}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Monto Total</div>
+          <div class="stat-value" style="font-size:22px">${UI.formatCurrency(totalMonto)}</div>
+          <div class="stat-sub">${monthName}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Choferes con actividad</div>
+          <div class="stat-value">${items.length}</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Resumen por Chofer &#8212; ${monthName}</div>
+        <div class="table-wrapper"><table>
+          <thead><tr>
+            <th>Chofer</th>
+            <th style="text-align:center">Total</th>
+            <th style="text-align:center">Urbanas</th>
+            <th style="text-align:center">Rurales</th>
+            <th style="text-align:right">Monto</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr>
+            <td>TOTAL</td>
+            <td style="text-align:center">${totalReg}</td>
+            <td style="text-align:center">${totalUrbanas}</td>
+            <td style="text-align:center">${totalRurales}</td>
+            <td style="text-align:right">${UI.formatCurrency(totalMonto)}</td>
+          </tr></tfoot>
+        </table></div>
+      </div>`;
+  }
+}
+
+/* ─── Tarifas ────────────────────────────────────────────────────────────────*/
+function makeTarifasPage() {
+  return {
+    title: 'Tarifas',
+    render(container) { _load(container); }
+  };
+
+  function _load(container) {
+    UI.showLoading(container);
+    Promise.all([API.tarifas.getActivas(), API.tarifas.getHistorial()])
+      .then(function(r) { _renderPage(container, r[0], r[1]); })
+      .catch(function(e) { UI.showError(container, e.message); });
+  }
+
+  function _renderPage(container, activas, historial) {
+    const activasRows = activas.map(t =>
+      `<tr>
+        <td>${UI.rutaBadge(t.tipoRuta)}</td>
+        <td><strong>${UI.formatCurrency(t.valor)}</strong></td>
+        <td>${t.descripcion || '-'}</td>
+        <td>${UI.formatDate(t.fechaVigencia)}</td>
+        <td>${UI.activoBadge(t.activo)}</td>
+      </tr>`
+    ).join('');
+
+    const histRows = historial.slice(0, 30).map(t =>
+      `<tr>
+        <td>${UI.rutaBadge(t.tipoRuta)}</td>
+        <td>${UI.formatCurrency(t.valor)}</td>
+        <td>${t.descripcion || '-'}</td>
+        <td>${UI.formatDate(t.fechaVigencia)}</td>
+        <td>${t.fechaVencimiento ? UI.formatDate(t.fechaVencimiento) : '<span style="color:var(--secondary)">Vigente</span>'}</td>
+      </tr>`
+    ).join('');
+
+    container.innerHTML = `
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" id="btn-nueva-tarifa">+ Nueva Tarifa</button>
+      </div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title">Tarifas Vigentes</div>
+        ${activas.length === 0
+          ? '<div class="empty-state"><p>Sin tarifas activas</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Tipo Ruta</th><th>Valor</th><th>Descripci&#243;n</th><th>Vigencia Desde</th><th>Estado</th></tr></thead>
+              <tbody>${activasRows}</tbody>
+             </table></div>`}
+      </div>
+      <div class="card">
+        <div class="card-title">Historial de Tarifas</div>
+        ${historial.length === 0
+          ? '<div class="empty-state"><p>Sin historial</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Tipo Ruta</th><th>Valor</th><th>Descripci&#243;n</th><th>Vigencia Desde</th><th>Hasta</th></tr></thead>
+              <tbody>${histRows}</tbody>
+             </table></div>`}
+      </div>`;
+
+    container.querySelector('#btn-nueva-tarifa').onclick = function() { _openCreateModal(container); };
+  }
+
+  function _openCreateModal(container) {
+    Modal.show({
+      title: 'Nueva Tarifa',
+      body: `
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Tipo de Ruta *</label>
+            <select class="form-control" id="t-tipo">
+              <option value="URBANA">Urbana</option>
+              <option value="RURAL">Rural</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor ($) *</label>
+            <input type="number" class="form-control" id="t-valor" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripci&#243;n *</label>
+          <input type="text" class="form-control" id="t-desc" placeholder="Ej: Tarifa urbana 2025">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Vigencia desde</label>
+          <input type="date" class="form-control" id="t-vigencia" value="${isoToday()}">
+        </div>`,
+      onSave: function() {
+        const tipoRuta    = Modal.val('t-tipo');
+        const valor       = parseFloat(Modal.val('t-valor'));
+        const descripcion = Modal.val('t-desc');
+        const fechaVig    = Modal.val('t-vigencia');
+        if (!descripcion || isNaN(valor) || valor < 0) { Toast.error('Completa todos los campos requeridos'); return; }
+        Modal.setLoading(true);
+        API.tarifas.crear({ tipoRuta, valor, descripcion, fechaVigencia: fechaVig || undefined })
+          .then(function() { Modal.hide(); Toast.success('Tarifa creada'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+}
+
+/* ─── Choferes ───────────────────────────────────────────────────────────────*/
+function makeChoferesPage() {
+  return {
+    title: 'Choferes',
+    render(container) { _load(container); }
+  };
+
+  function _load(container) {
+    UI.showLoading(container);
+    API.choferes.getAll()
+      .then(function(data) { _renderPage(container, data); })
+      .catch(function(e) { UI.showError(container, e.message); });
+  }
+
+  function _renderPage(container, data) {
+    const rows = data.map(c =>
+      `<tr>
+        <td><strong>${c.nombre}</strong></td>
+        <td>${c.dni || '-'}</td>
+        <td>${c.telefono || '-'}</td>
+        <td>${UI.formatDate(c.fechaIngreso)}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.notas || '-'}</td>
+        <td>${UI.activoBadge(c.activo)}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-icon" data-action="edit" data-id="${c.choferId}" title="Editar">&#9998;</button>
+            ${c.activo ? `<button class="btn-icon" data-action="desactivar" data-id="${c.choferId}" title="Desactivar">&#128683;</button>` : ''}
+          </div>
+        </td>
+      </tr>`
+    ).join('');
+
+    container.innerHTML = `
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" id="btn-nuevo-chofer">+ Nuevo Chofer</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Choferes (${data.length})</div>
+        ${data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#128100;</div><p>Sin choferes registrados</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Nombre</th><th>DNI</th><th>Tel&#233;fono</th><th>Ingreso</th><th>Notas</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody>${rows}</tbody>
+             </table></div>`}
+      </div>`;
+
+    container.querySelector('#btn-nuevo-chofer').onclick = function() { _openCreateModal(container); };
+    container.querySelectorAll('[data-action]').forEach(function(btn) {
+      const id = btn.dataset.id;
+      const c  = data.find(x => x.choferId === id);
+      if (btn.dataset.action === 'edit')       btn.onclick = function() { _openEditModal(container, c); };
+      if (btn.dataset.action === 'desactivar') btn.onclick = function() { _confirmDesactivar(container, id, c.nombre); };
+    });
+  }
+
+  function _choferForm(c) {
+    return `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Nombre completo *</label>
+          <input type="text" class="form-control" id="ch-nombre" value="${c ? c.nombre : ''}" placeholder="Juan P&#233;rez">
+        </div>
+        <div class="form-group">
+          <label class="form-label">DNI / C&#233;dula *</label>
+          <input type="text" class="form-control" id="ch-dni" value="${c ? (c.dni || '') : ''}" placeholder="0912345678" ${c ? 'readonly' : ''}>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tel&#233;fono</label>
+          <input type="text" class="form-control" id="ch-telefono" value="${c ? (c.telefono || '') : ''}" placeholder="0987654321">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha de Ingreso</label>
+          <input type="date" class="form-control" id="ch-ingreso" value="${c && c.fechaIngreso ? c.fechaIngreso.split('T')[0] : isoToday()}">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <textarea class="form-control" id="ch-notas" rows="2">${c ? (c.notas || '') : ''}</textarea>
+      </div>`;
+  }
+
+  function _openCreateModal(container) {
+    Modal.show({
+      title: 'Nuevo Chofer',
+      body: _choferForm(null),
+      onSave: function() {
+        const nombre   = Modal.val('ch-nombre');
+        const dni      = Modal.val('ch-dni');
+        const telefono = Modal.val('ch-telefono');
+        const ingreso  = Modal.val('ch-ingreso');
+        const notas    = Modal.val('ch-notas');
+        if (!nombre || !dni) { Toast.error('Nombre y DNI son requeridos'); return; }
+        Modal.setLoading(true);
+        API.choferes.crear({ nombre, dni, telefono: telefono || undefined, fechaIngreso: ingreso || undefined, notas: notas || undefined })
+          .then(function() { Modal.hide(); Toast.success('Chofer creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _openEditModal(container, c) {
+    Modal.show({
+      title: 'Editar Chofer',
+      body: _choferForm(c),
+      onSave: function() {
+        const dto = {
+          nombre:   Modal.val('ch-nombre')   || undefined,
+          telefono: Modal.val('ch-telefono') || undefined,
+          notas:    Modal.val('ch-notas')    || undefined,
+        };
+        Modal.setLoading(true);
+        API.choferes.actualizar(c.choferId, dto)
+          .then(function() { Modal.hide(); Toast.success('Chofer actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _confirmDesactivar(container, id, nombre) {
+    Modal.show({
+      title: 'Desactivar Chofer',
+      body: `<p>&#191;Desactivar al chofer <strong>${nombre}</strong>? Ya no podr&#225; registrar rutas.</p>`,
+      saveLabel: 'Desactivar', danger: true,
+      onSave: function() {
+        Modal.setLoading(true);
+        API.choferes.desactivar(id)
+          .then(function() { Modal.hide(); Toast.success('Chofer desactivado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+}
+
+/* ─── Camiones ───────────────────────────────────────────────────────────────*/
+function makeCamionesPage() {
+  let _choferes = [];
+
+  return {
+    title: 'Camiones',
+    render(container) { _load(container); }
+  };
+
+  function _load(container) {
+    UI.showLoading(container);
+    Promise.all([API.camiones.getAll(), API.choferes.getAll()])
+      .then(function(r) { _choferes = r[1]; _renderPage(container, r[0]); })
+      .catch(function(e) { UI.showError(container, e.message); });
+  }
+
+  function _renderPage(container, data) {
+    const rows = data.map(c =>
+      `<tr>
+        <td><strong>${c.patente}</strong></td>
+        <td>${c.modelo || '-'}</td>
+        <td>${c.anio || '-'}</td>
+        <td>${UI.choferName(_choferes, c.choferId)}</td>
+        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.notas || '-'}</td>
+        <td>${UI.activoBadge(c.activo)}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-icon" data-action="edit" data-id="${c.camionId}" title="Editar">&#9998;</button>
+            ${c.activo ? `<button class="btn-icon" data-action="desactivar" data-id="${c.camionId}" title="Desactivar">&#128683;</button>` : ''}
+          </div>
+        </td>
+      </tr>`
+    ).join('');
+
+    container.innerHTML = `
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" id="btn-nuevo-camion">+ Nuevo Cami&#243;n</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Camiones (${data.length})</div>
+        ${data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#128667;</div><p>Sin camiones registrados</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Patente</th><th>Modelo</th><th>A&#241;o</th><th>Chofer Asignado</th><th>Notas</th><th>Estado</th><th>Acciones</th></tr></thead>
+              <tbody>${rows}</tbody>
+             </table></div>`}
+      </div>`;
+
+    container.querySelector('#btn-nuevo-camion').onclick = function() { _openCreateModal(container); };
+    container.querySelectorAll('[data-action]').forEach(function(btn) {
+      const id = btn.dataset.id;
+      const c  = data.find(x => x.camionId === id);
+      if (btn.dataset.action === 'edit')       btn.onclick = function() { _openEditModal(container, c); };
+      if (btn.dataset.action === 'desactivar') btn.onclick = function() { _confirmDesactivar(container, id, c.patente); };
+    });
+  }
+
+  function _camionForm(c) {
+    return `
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Patente *</label>
+          <input type="text" class="form-control" id="ca-patente" value="${c ? c.patente : ''}" placeholder="ABC-1234" ${c ? 'readonly' : ''}>
+        </div>
+        <div class="form-group">
+          <label class="form-label">A&#241;o</label>
+          <input type="number" class="form-control" id="ca-anio" value="${c ? (c.anio || '') : ''}" placeholder="2020" min="1990" max="2035">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Modelo</label>
+          <input type="text" class="form-control" id="ca-modelo" value="${c ? (c.modelo || '') : ''}" placeholder="Hino 500">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chofer Asignado *</label>
+          <select class="form-control" id="ca-chofer">${UI.choferOptions(_choferes, c ? (c.choferId || '') : '')}</select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notas</label>
+        <textarea class="form-control" id="ca-notas" rows="2">${c ? (c.notas || '') : ''}</textarea>
+      </div>`;
+  }
+
+  function _openCreateModal(container) {
+    Modal.show({
+      title: 'Nuevo Cami&#243;n',
+      body: _camionForm(null),
+      onSave: function() {
+        const patente  = Modal.val('ca-patente');
+        const modelo   = Modal.val('ca-modelo');
+        const anioStr  = Modal.val('ca-anio');
+        const choferId = Modal.val('ca-chofer');
+        const notas    = Modal.val('ca-notas');
+        if (!patente || !choferId) { Toast.error('Patente y chofer son requeridos'); return; }
+        Modal.setLoading(true);
+        API.camiones.crear({ patente, modelo: modelo || undefined, anio: anioStr ? parseInt(anioStr) : undefined, choferId, notas: notas || undefined })
+          .then(function() { Modal.hide(); Toast.success('Cami\u00f3n creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _openEditModal(container, c) {
+    Modal.show({
+      title: 'Editar Cami\u00f3n',
+      body: _camionForm(c),
+      onSave: function() {
+        const anioStr = Modal.val('ca-anio');
+        const dto = {
+          modelo:   Modal.val('ca-modelo')  || undefined,
+          anio:     anioStr ? parseInt(anioStr) : undefined,
+          choferId: Modal.val('ca-chofer')  || undefined,
+          notas:    Modal.val('ca-notas')   || undefined,
+        };
+        Modal.setLoading(true);
+        API.camiones.actualizar(c.camionId, dto)
+          .then(function() { Modal.hide(); Toast.success('Cami\u00f3n actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _confirmDesactivar(container, id, patente) {
+    Modal.show({
+      title: 'Desactivar Cami\u00f3n',
+      body: `<p>&#191;Desactivar el cami&#243;n <strong>${patente}</strong>?</p>`,
+      saveLabel: 'Desactivar', danger: true,
+      onSave: function() {
+        Modal.setLoading(true);
+        API.camiones.desactivar(id)
+          .then(function() { Modal.hide(); Toast.success('Cami\u00f3n desactivado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+}
+
+/* ─── Usuarios ───────────────────────────────────────────────────────────────*/
+function makeUsuariosPage() {
+  let _choferes = [];
+
+  return {
+    title: 'Usuarios',
+    render(container) { _load(container); }
+  };
+
+  function _load(container) {
+    UI.showLoading(container);
+    Promise.all([API.usuarios.getAll(), API.choferes.getAll()])
+      .then(function(r) { _choferes = r[1]; _renderPage(container, r[0]); })
+      .catch(function(e) { UI.showError(container, e.message); });
+  }
+
+  function _renderPage(container, data) {
+    const rows = data.map(u =>
+      `<tr>
+        <td>${u.correo}</td>
+        <td><span class="badge badge-${(u.rol || '').toLowerCase()}">${u.rol}</span></td>
+        <td>${u.choferId ? UI.choferName(_choferes, u.choferId) : '-'}</td>
+        <td>${UI.activoBadge(u.activo)}</td>
+        <td>${UI.formatDateTime(u.ultimoAcceso)}</td>
+        <td>
+          <div class="action-btns">
+            <button class="btn-icon" data-action="edit" data-id="${u.usuarioId}" title="Editar">&#9998;</button>
+            ${u.activo ? `<button class="btn-icon" data-action="desactivar" data-id="${u.usuarioId}" title="Desactivar">&#128683;</button>` : ''}
+          </div>
+        </td>
+      </tr>`
+    ).join('');
+
+    container.innerHTML = `
+      <div class="toolbar">
+        <div></div>
+        <button class="btn btn-primary" id="btn-nuevo-usuario">+ Nuevo Usuario</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Usuarios (${data.length})</div>
+        ${data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#9881;</div><p>Sin usuarios registrados</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Correo</th><th>Rol</th><th>Chofer Vinculado</th><th>Estado</th><th>&#218;ltimo Acceso</th><th>Acciones</th></tr></thead>
+              <tbody>${rows}</tbody>
+             </table></div>`}
+      </div>`;
+
+    container.querySelector('#btn-nuevo-usuario').onclick = function() { _openCreateModal(container); };
+    container.querySelectorAll('[data-action]').forEach(function(btn) {
+      const id = btn.dataset.id;
+      const u  = data.find(x => x.usuarioId === id);
+      if (btn.dataset.action === 'edit')       btn.onclick = function() { _openEditModal(container, u); };
+      if (btn.dataset.action === 'desactivar') btn.onclick = function() { _confirmDesactivar(container, id, u.correo); };
+    });
+  }
+
+  function _usuarioForm(u) {
+    const choferOpts = '<option value="">Sin vinculaci\u00f3n</option>' +
+      _choferes.map(c =>
+        `<option value="${c.choferId}" ${u && u.choferId === c.choferId ? 'selected' : ''}>${c.nombre}</option>`
+      ).join('');
+    return `
+      <div class="form-group">
+        <label class="form-label">Correo Gmail *</label>
+        <input type="email" class="form-control" id="us-correo" value="${u ? u.correo : ''}" placeholder="usuario@gmail.com" ${u ? 'readonly' : ''}>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Rol *</label>
+          <select class="form-control" id="us-rol">
+            <option value="CHOFER" ${!u || u.rol === 'CHOFER' ? 'selected' : ''}>Chofer</option>
+            <option value="ADMIN"  ${u && u.rol === 'ADMIN' ? 'selected' : ''}>Admin</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Chofer Vinculado</label>
+          <select class="form-control" id="us-chofer">${choferOpts}</select>
+        </div>
+      </div>`;
+  }
+
+  function _openCreateModal(container) {
+    Modal.show({
+      title: 'Nuevo Usuario',
+      body: _usuarioForm(null),
+      onSave: function() {
+        const correo   = Modal.val('us-correo');
+        const rol      = Modal.val('us-rol');
+        const choferId = Modal.val('us-chofer');
+        if (!correo) { Toast.error('El correo es requerido'); return; }
+        Modal.setLoading(true);
+        API.usuarios.crear({ correo, rol, choferId: choferId || undefined })
+          .then(function() { Modal.hide(); Toast.success('Usuario creado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _openEditModal(container, u) {
+    Modal.show({
+      title: 'Editar Usuario',
+      body: _usuarioForm(u),
+      onSave: function() {
+        const dto = {
+          rol:      Modal.val('us-rol')    || undefined,
+          choferId: Modal.val('us-chofer') || undefined,
+        };
+        Modal.setLoading(true);
+        API.usuarios.actualizar(u.usuarioId, dto)
+          .then(function() { Modal.hide(); Toast.success('Usuario actualizado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+
+  function _confirmDesactivar(container, id, correo) {
+    Modal.show({
+      title: 'Desactivar Usuario',
+      body: `<p>&#191;Desactivar al usuario <strong>${correo}</strong>? No podr&#225; acceder al sistema.</p>`,
+      saveLabel: 'Desactivar', danger: true,
+      onSave: function() {
+        Modal.setLoading(true);
+        API.usuarios.desactivar(id)
+          .then(function() { Modal.hide(); Toast.success('Usuario desactivado'); _load(container); })
+          .catch(function(e) { Modal.setLoading(false); Toast.error(e.message); });
+      }
+    });
+  }
+}
+
+/* ─── Auditoría ──────────────────────────────────────────────────────────────*/
+function makeAuditoriaPage() {
+  return {
+    title: 'Auditor\u00eda',
+    render(container) { _load(container, null); }
+  };
+
+  function _load(container, emailFiltro) {
+    UI.showLoading(container);
+    const promise = emailFiltro ? API.auditoria.byUsuario(emailFiltro) : API.auditoria.getAll();
+    promise
+      .then(function(data) { _renderPage(container, data, emailFiltro); })
+      .catch(function(e) { UI.showError(container, e.message); });
+  }
+
+  function _renderPage(container, data, emailFiltro) {
+    const rows = data.slice(0, 100).map(a => {
+      const ok = a.resultado === 'EXITO';
+      return `<tr>
+        <td>${UI.formatDateTime(a.timestamp)}</td>
+        <td>${a.usuarioEmail || '-'}</td>
+        <td><span class="badge">${a.accion || '-'}</span></td>
+        <td>${a.entidad || '-'}</td>
+        <td style="font-family:monospace;font-size:11px">${a.entidadId || '-'}</td>
+        <td><span class="badge ${ok ? 'badge-activo' : 'badge-inactivo'}">${a.resultado || '-'}</span></td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.detalle || ''}">${a.detalle || '-'}</td>
+      </tr>`;
+    }).join('');
+
+    const countLabel = data.length > 100 ? '100+ registros (mostrando primeros 100)' : data.length + ' registros';
+
+    container.innerHTML = `
+      <div class="card" style="margin-bottom:16px">
+        <div class="toolbar">
+          <div class="filter-bar">
+            <input type="email" class="form-control" id="au-email" value="${emailFiltro || ''}" placeholder="Filtrar por correo">
+            <button class="btn btn-secondary" id="btn-filtrar-au">Filtrar</button>
+            <button class="btn btn-secondary" id="btn-limpiar-au">Ver todos</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Registro de Auditor&#237;a (${countLabel})</div>
+        ${data.length === 0
+          ? '<div class="empty-state"><div class="empty-state-icon">&#128269;</div><p>Sin registros de auditor&#237;a</p></div>'
+          : `<div class="table-wrapper"><table>
+              <thead><tr><th>Fecha/Hora</th><th>Usuario</th><th>Acci&#243;n</th><th>Entidad</th><th>ID</th><th>Resultado</th><th>Detalle</th></tr></thead>
+              <tbody>${rows}</tbody>
+             </table></div>`}
+      </div>`;
+
+    container.querySelector('#btn-filtrar-au').onclick = function() {
+      const email = container.querySelector('#au-email').value.trim();
+      _load(container, email || null);
+    };
+    container.querySelector('#btn-limpiar-au').onclick = function() { _load(container, null); };
+  }
+}
+
+/* ─── App Bootstrap ──────────────────────────────────────────────────────────*/
+document.addEventListener('DOMContentLoaded', function() {
+  const session = window.__SESSION__;
+
+  if (!session) {
+    const tpl = document.getElementById('tpl-no-access');
+    document.getElementById('app').innerHTML = '';
+    document.getElementById('app').appendChild(tpl.content.cloneNode(true));
+    return;
+  }
+
+  const tpl = document.getElementById('tpl-layout');
+  document.getElementById('app').innerHTML = '';
+  document.getElementById('app').appendChild(tpl.content.cloneNode(true));
+
+  document.getElementById('app-nombre').textContent = window.__APP_NOMBRE__;
+  document.getElementById('sidebar-user-email').textContent = session.email;
+  document.getElementById('topbar-user').textContent = session.email;
+  const rol = session.rol || '';
+  document.getElementById('topbar-role').textContent = rol;
+  document.getElementById('topbar-role').className = 'badge badge-' + rol.toLowerCase();
+
+  document.getElementById('btn-logout').addEventListener('click', function() {
+    if (confirm('&#191;Desea cerrar la aplicaci&#243;n?')) window.close();
+  });
+
+  document.getElementById('sidebar-toggle').addEventListener('click', function() {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+
+  buildMenu(session);
+  registerRoutes(session);
+  Router.start();
+
+  const loading = document.getElementById('loading-screen');
+  if (loading) loading.remove();
+});
+
+function buildMenu(session) {
+  const nav = document.getElementById('sidebar-nav');
+  const isAdmin = session.rol === 'ADMIN';
+  const items = [
+    { route: 'dashboard', icon: '&#128202;', label: 'Dashboard',  always: true },
+    { route: 'registros', icon: '&#128203;', label: 'Registros',  always: true },
+    { route: 'reportes',  icon: '&#128200;', label: 'Reportes',   always: true },
+    { route: 'tarifas',   icon: '&#36;',     label: 'Tarifas',    admin: true },
+    { route: 'choferes',  icon: '&#128100;', label: 'Choferes',   admin: true },
+    { route: 'camiones',  icon: '&#128667;', label: 'Camiones',   admin: true },
+    { route: 'usuarios',  icon: '&#9881;',   label: 'Usuarios',   admin: true },
+    { route: 'auditoria', icon: '&#128269;', label: 'Auditor\u00eda', admin: true },
+  ];
+
+  let html = '<div class="nav-section">General</div>';
+  items.filter(i => i.always).forEach(function(i) {
+    html += `<div class="nav-item" data-route="${i.route}" onclick="Router.navigate('${i.route}')">
+      <span class="nav-icon">${i.icon}</span>${i.label}</div>`;
+  });
+  if (isAdmin) {
+    html += '<div class="nav-section">Administraci\u00f3n</div>';
+    items.filter(i => i.admin).forEach(function(i) {
+      html += `<div class="nav-item" data-route="${i.route}" onclick="Router.navigate('${i.route}')">
+        <span class="nav-icon">${i.icon}</span>${i.label}</div>`;
+    });
+  }
+  nav.innerHTML = html;
+}
+
+function registerRoutes(session) {
+  Router.register('dashboard', makeDashboardPage());
+  Router.register('registros', makeRegistrosPage(session));
+  Router.register('reportes',  makeReportesPage());
+  Router.register('tarifas',   makeTarifasPage());
+  Router.register('choferes',  makeChoferesPage());
+  Router.register('camiones',  makeCamionesPage());
+  Router.register('usuarios',  makeUsuariosPage());
+  Router.register('auditoria', makeAuditoriaPage());
+}
+</script>
