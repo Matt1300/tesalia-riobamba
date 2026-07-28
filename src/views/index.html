@@ -117,6 +117,13 @@
     .action-btns { display: flex; gap: 4px; }
     .btn-icon { background: none; border: 1px solid var(--border); border-radius: var(--radius); padding: 3px 8px; cursor: pointer; font-size: 13px; transition: background var(--transition); line-height: 1.4; }
     .btn-icon:hover { background: var(--bg); }
+    .btn-icon:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-xls  { background: #e6f4ea; color: #1e6b35; border-color: #a8d5b5; font-weight: 600; font-size: 11px; letter-spacing: .3px; }
+    .btn-xls:hover  { background: #c8e6c9; }
+    .btn-pdf-r { background: #fce8e6; color: #b71c1c; border-color: #f5a8a3; font-weight: 600; font-size: 11px; letter-spacing: .3px; }
+    .btn-pdf-r:hover { background: #ffcdd2; }
+    .btn-det  { background: #e8f0fe; color: #1557b0; border-color: #a8c4f5; font-size: 11px; }
+    .btn-det:hover  { background: #d2e3fc; }
 
     /* Modal */
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -447,59 +454,56 @@
   function makeDashboardPage() {
     var _choferes = [], _camiones = [];
 
-    function _render(container, anio, mes, choferId) {
-      var monthName = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
-      var statsEl  = container.querySelector('#db-stats');
-      var tableEl  = container.querySelector('#db-table');
+    function _render(container, filtro) {
+      var statsEl = container.querySelector('#db-stats');
+      var tableEl = container.querySelector('#db-table');
       if (!statsEl || !tableEl) return;
-
       statsEl.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div></div>';
       tableEl.innerHTML = '';
 
-      if (choferId) {
-        // Vista individual: reporte del chofer
-        API.reportes.reporteChofer(choferId, { anio: anio, mes: mes })
-          .then(function(d) {
-            var nombre = d.chofer ? d.chofer.nombre : choferId;
-            statsEl.innerHTML =
-              '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + d.totalRegistros + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(d.montoTotal) + '</div><div class="stat-sub">' + nombre + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Rutas Urbanas</div><div class="stat-value" style="color:var(--primary)">' + d.totalUrbanas + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Rutas Rurales</div><div class="stat-value" style="color:var(--danger)">' + d.totalRurales + '</div></div>';
-            tableEl.innerHTML = '<div class="card"><div class="card-title">Resumen &mdash; ' + nombre + ' &mdash; ' + monthName + '</div>' +
-              '<div class="empty-state" style="padding:20px"><p>Ver detalle completo en la secci\u00f3n <strong>Reportes</strong></p></div></div>';
-          })
-          .catch(function(e) { UI.showError(statsEl, e.message); });
-      } else {
-        // Vista global
-        Promise.all([
-          API.registros.filtrar({ anio: anio, mes: mes }),
-        ]).then(function(r) {
-          var registros = r[0];
-          var actChoferes = _choferes.filter(function(c) { return c.activo; }).length;
-          var actCamiones = _camiones.filter(function(c) { return c.activo; }).length;
-          var totalMonto  = registros.reduce(function(s, x) { return s + (x.tarifaAplicada || 0); }, 0);
-          var pendientes  = registros.filter(function(x) { return x.estado === 'PENDIENTE'; }).length;
+      var anio = filtro.anio, mes = filtro.mes;
+      var monthName = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
 
-          statsEl.innerHTML =
-            '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + registros.length + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Monto total del mes</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' + actChoferes + '</div><div class="stat-sub">de ' + _choferes.length + ' total</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' + actCamiones + '</div><div class="stat-sub">de ' + _camiones.length + ' total</div></div>' +
-            '<div class="stat-card"><div class="stat-label">Pendientes de validar</div><div class="stat-value" style="color:var(--warning)">' + pendientes + '</div><div class="stat-sub">del mes actual</div></div>';
+      API.registros.filtrar(filtro).then(function(registros) {
+        var totalMonto   = registros.reduce(function(s, x) { return s + (x.tarifaAplicada || 0); }, 0);
+        var totalUrbanas = registros.filter(function(x) { return x.tipoRuta === 'URBANA'; }).length;
+        var totalRurales = registros.filter(function(x) { return x.tipoRuta === 'RURAL'; }).length;
+        var pendientes   = registros.filter(function(x) { return x.estado === 'PENDIENTE'; }).length;
+        var actChoferes  = _choferes.filter(function(c) { return c.activo; }).length;
+        var actCamiones  = _camiones.filter(function(c) { return c.activo; }).length;
+        var subtitulo    = filtro.choferId ? UI.choferName(_choferes, filtro.choferId) : monthName;
 
-          var rows = registros.slice(0, 10).map(function(reg) {
-            return '<tr><td>' + UI.formatDate(reg.fecha) + '</td><td>' + UI.choferName(_choferes, reg.choferId) +
-              '</td><td>' + UI.camionPatente(_camiones, reg.camionId) + '</td><td>' + UI.rutaBadge(reg.tipoRuta) +
-              '</td><td>' + UI.formatCurrency(reg.tarifaAplicada) + '</td><td>' + UI.statusBadge(reg.estado) + '</td></tr>';
-          }).join('');
-          tableEl.innerHTML = '<div class="card"><div class="card-title">&#218;ltimos registros del mes</div>' +
-            (registros.length === 0
-              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros este mes</p></div>'
-              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            ) + '</div>';
-        }).catch(function(e) { UI.showError(statsEl, e.message); });
-      }
+        var statsCards =
+          '<div class="stat-card"><div class="stat-label">Registros</div><div class="stat-value">' + registros.length + '</div><div class="stat-sub">' + subtitulo + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + subtitulo + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Urbanas</div><div class="stat-value" style="color:var(--primary)">' + totalUrbanas + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Rurales</div><div class="stat-value" style="color:var(--danger)">' + totalRurales + '</div></div>' +
+          '<div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-value" style="color:var(--warning)">' + pendientes + '</div></div>';
+
+        if (!filtro.choferId) {
+          statsCards +=
+            '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' + actChoferes + '</div><div class="stat-sub">de ' + _choferes.length + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' + actCamiones + '</div><div class="stat-sub">de ' + _camiones.length + '</div></div>';
+        }
+        statsEl.innerHTML = statsCards;
+
+        var rows = registros.slice(0, 20).map(function(reg) {
+          return '<tr><td>' + UI.formatDate(reg.fecha) + '</td>' +
+            '<td>' + UI.choferName(_choferes, reg.choferId) + '</td>' +
+            '<td>' + UI.camionPatente(_camiones, reg.camionId) + '</td>' +
+            '<td>' + UI.rutaBadge(reg.tipoRuta) + '</td>' +
+            '<td style="text-align:right">' + UI.formatCurrency(reg.tarifaAplicada) + '</td>' +
+            '<td>' + UI.statusBadge(reg.estado) + '</td></tr>';
+        }).join('');
+        var tableTitle = 'Registros' + (registros.length > 20 ? ' (mostrando 20 de ' + registros.length + ')' : ' (' + registros.length + ')');
+        tableEl.innerHTML = '<div class="card"><div class="card-title">' + tableTitle + '</div>' +
+          (registros.length === 0
+            ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para el filtro seleccionado</p></div>'
+            : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody>' +
+              '<tfoot><tr><td colspan="4">Total</td><td style="text-align:right">' + UI.formatCurrency(totalMonto) + '</td><td></td></tr></tfoot>' +
+              '</table></div>'
+          ) + '</div>';
+      }).catch(function(e) { UI.showError(statsEl, e.message); });
     }
 
     return {
@@ -519,17 +523,26 @@
               '<select class="form-control" id="db-mes">' + monthOptions(ym.mes) + '</select>' +
               '<select class="form-control" id="db-anio">' + yearOptions(ym.anio) + '</select>' +
               '<select class="form-control" id="db-chofer">' + choferOpts + '</select>' +
+              '<select class="form-control" id="db-estado">' +
+                '<option value="">Todos los estados</option>' +
+                '<option value="PENDIENTE">Pendiente</option>' +
+                '<option value="VALIDADO">Validado</option>' +
+                '<option value="RECHAZADO">Rechazado</option>' +
+              '</select>' +
               '<button class="btn btn-primary" id="db-filtrar">Actualizar</button>' +
               '</div></div>' +
               '<div class="cards-grid" id="db-stats"></div>' +
               '<div id="db-table"></div>';
             container.querySelector('#db-filtrar').onclick = function() {
-              var a = parseInt(container.querySelector('#db-anio').value);
-              var m = parseInt(container.querySelector('#db-mes').value);
-              var c = container.querySelector('#db-chofer').value;
-              _render(container, a, m, c || null);
+              var filtro = {
+                anio:     parseInt(container.querySelector('#db-anio').value),
+                mes:      parseInt(container.querySelector('#db-mes').value),
+                choferId: container.querySelector('#db-chofer').value || undefined,
+                estado:   container.querySelector('#db-estado').value || undefined,
+              };
+              _render(container, filtro);
             };
-            _render(container, ym.anio, ym.mes, null);
+            _render(container, { anio: ym.anio, mes: ym.mes });
           })
           .catch(function(e) { UI.showError(container, e.message); });
       }
@@ -748,9 +761,9 @@
               '<td style="text-align:center">' + (r.totalRurales||0) + '</td>' +
               '<td style="text-align:right;font-weight:500">' + UI.formatCurrency(r.montoTotal) + '</td>' +
               '<td><div class="action-btns">' +
-                '<button class="btn-icon btn-detalle" data-id="' + cId + '" data-nombre="' + nombre + '" title="Ver detalle">&#128203;</button>' +
-                '<button class="btn-icon btn-excel" data-id="' + cId + '" data-nombre="' + nombre + '" title="Exportar Excel">&#128196;</button>' +
-                '<button class="btn-icon btn-pdf" data-id="' + cId + '" data-nombre="' + nombre + '" title="Exportar PDF">&#128196;PDF</button>' +
+                '<button class="btn-icon btn-det btn-detalle" data-id="' + cId + '" data-nombre="' + nombre + '" title="Ver detalle de registros">Ver</button>' +
+                '<button class="btn-icon btn-xls btn-excel" data-id="' + cId + '" data-nombre="' + nombre + '" title="Descargar Excel (.xlsx)">XLS</button>' +
+                '<button class="btn-icon btn-pdf-r btn-pdf" data-id="' + cId + '" data-nombre="' + nombre + '" title="Descargar PDF">PDF</button>' +
               '</div></td>' +
             '</tr>';
           }).join('');
@@ -761,7 +774,7 @@
               '<div class="stat-card"><div class="stat-label">Choferes con actividad</div><div class="stat-value">' + porChofer.length + '</div></div>' +
             '</div>' +
             '<div class="card"><div class="toolbar" style="margin-bottom:8px"><div class="card-title" style="margin-bottom:0">Resumen por Chofer &mdash; ' + monthName + '</div>' +
-            '<button class="btn btn-secondary btn-export-all" id="btn-export-all">&#128196; Exportar Todo Excel</button></div>' +
+            '<button class="btn btn-xls btn-export-all" id="btn-export-all" title="Exportar resumen completo en Excel">XLS Global</button></div>' +
             '<div class="table-wrapper"><table>' +
               '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Urbanas</th><th style="text-align:center">Rurales</th><th style="text-align:right">Monto</th><th>Acciones</th></tr></thead>' +
               '<tbody>' + rows + '</tbody>' +
@@ -773,8 +786,8 @@
             var btn = el.querySelector('#btn-export-all');
             btn.disabled = true; btn.textContent = 'Generando...';
             API.reportes.exportarExcel(filtro)
-              .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); btn.disabled = false; btn.textContent = '&#128196; Exportar Todo Excel'; })
-              .catch(function(e) { Toast.error(e.message); btn.disabled = false; btn.textContent = '&#128196; Exportar Todo Excel'; });
+              .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); btn.disabled = false; btn.textContent = 'XLS Global'; })
+              .catch(function(e) { Toast.error(e.message); btn.disabled = false; btn.textContent = 'XLS Global'; });
           };
 
           // Botones por fila
@@ -785,16 +798,16 @@
             btn.onclick = function() {
               var b = btn; b.disabled = true; b.textContent = '...';
               API.reportes.exportarExcelChofer(b.dataset.id, filtro)
-                .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); b.disabled = false; b.textContent = '&#128196;'; })
-                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = '&#128196;'; });
+                .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); b.disabled = false; b.textContent = 'XLS'; })
+                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = 'XLS'; });
             };
           });
           el.querySelectorAll('.btn-pdf').forEach(function(btn) {
             btn.onclick = function() {
               var b = btn; b.disabled = true; b.textContent = '...';
               API.reportes.exportarPdfChofer(b.dataset.id, filtro)
-                .then(function(res) { _downloadBase64(res); Toast.success('PDF descargado'); b.disabled = false; b.textContent = '&#128196;PDF'; })
-                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = '&#128196;PDF'; });
+                .then(function(res) { _downloadBase64(res); Toast.success('PDF descargado'); b.disabled = false; b.textContent = 'PDF'; })
+                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = 'PDF'; });
             };
           });
         })

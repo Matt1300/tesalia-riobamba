@@ -63,8 +63,7 @@ namespace ExportService {
       _buildChoferSheet(ss.getActiveSheet(), detalle);
       SpreadsheetApp.flush();
 
-      const blob = DriveApp.getFileById(ssId)
-        .getAs('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const blob = _getExcelBlob(ssId);
       const base64 = Utilities.base64Encode(blob.getBytes());
 
       AuditoriaService.log({
@@ -102,8 +101,7 @@ namespace ExportService {
       _buildResumenSheet(ss.getActiveSheet(), resumen, filtro);
       SpreadsheetApp.flush();
 
-      const blob = DriveApp.getFileById(ssId)
-        .getAs('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      const blob = _getExcelBlob(ssId);
       const base64 = Utilities.base64Encode(blob.getBytes());
 
       AuditoriaService.log({
@@ -128,6 +126,22 @@ namespace ExportService {
 
   function _sanitizeTitle(title: string): string {
     return title.replace(/[→\-\s]+/g, '_').replace(/[^\w]/g, '').slice(0, 80);
+  }
+
+  /**
+   * Exporta un Spreadsheet de Google como .xlsx usando UrlFetchApp.
+   * DriveApp.getAs('xlsx') no funciona con archivos nativos de Google Sheets.
+   */
+  function _getExcelBlob(ssId: string): GoogleAppsScript.Base.Blob {
+    const url = `https://docs.google.com/spreadsheets/d/${ssId}/export?format=xlsx`;
+    const response = UrlFetchApp.fetch(url, {
+      headers: { Authorization: `Bearer ${ScriptApp.getOAuthToken()}` },
+      muteHttpExceptions: true,
+    });
+    if (response.getResponseCode() !== 200) {
+      throw new Error(`Error exportando Excel (HTTP ${response.getResponseCode()})`);
+    }
+    return response.getBlob();
   }
 
   function _buildChoferSheet(
