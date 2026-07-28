@@ -49,4 +49,8 @@ namespace Environment {
   export function getFormId(): string {
     return get(Constants.CONFIG_KEYS.FORM_ID);
   }
+
+  export function getEmailNotificaciones(): string {
+    return get(Constants.CONFIG_KEYS.EMAIL_NOTIFICACIONES);
+  }
 }

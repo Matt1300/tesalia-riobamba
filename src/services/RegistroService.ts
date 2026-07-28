@@ -103,8 +103,6 @@ namespace RegistroService {
       throw new Error(`Respuesta de formulario ${dto.formResponseId} ya fue procesada.`);
     }
 
-    // Usar una sesión de sistema para registros de formulario
-    const usuario = UsuariosRepository.findByEmail(dto.choferId);
     const systemSession: Auth.UserSession = {
       email: 'system@form',
       rol: Models.Rol.ADMIN,

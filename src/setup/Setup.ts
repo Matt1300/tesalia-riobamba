@@ -81,27 +81,110 @@ namespace Setup {
     if (!sheet || sheet.getLastRow() > 1) return; // Ya tiene datos
 
     const ahora = new Date().toISOString();
-    const C = Constants.COLS.CONFIGURACION;
 
-    const configs: Record<string, string> = {
-      [Constants.CONFIG_KEYS.APP_NOMBRE]: 'Tesalia Riobamba - Control de Rutas',
-      [Constants.CONFIG_KEYS.MONEDA]: 'USD',
-      [Constants.CONFIG_KEYS.TIMEZONE]: 'America/Guayaquil',
-      [Constants.CONFIG_KEYS.EMAIL_NOTIFICACIONES]: '',
-    };
+    const configs: [string, string, string][] = [
+      [Constants.CONFIG_KEYS.APP_NOMBRE,           'Tesalia Riobamba - Control de Rutas', 'Nombre de la aplicación'],
+      [Constants.CONFIG_KEYS.MONEDA,               'USD',                                  'Moneda del sistema (USD, EUR, etc.)'],
+      [Constants.CONFIG_KEYS.TIMEZONE,             'America/Guayaquil',                    'Zona horaria'],
+      [Constants.CONFIG_KEYS.EMAIL_NOTIFICACIONES, '',                                     'Email del admin para notificaciones (dejar vacío para deshabilitar)'],
+      [Constants.CONFIG_KEYS.FORM_ID,              '',                                     'ID del Google Form (se llena automáticamente al ejecutar setupForm)'],
+    ];
 
-    const descripciones: Record<string, string> = {
-      [Constants.CONFIG_KEYS.APP_NOMBRE]: 'Nombre de la aplicación',
-      [Constants.CONFIG_KEYS.MONEDA]: 'Moneda del sistema (USD, EUR, etc.)',
-      [Constants.CONFIG_KEYS.TIMEZONE]: 'Zona horaria',
-      [Constants.CONFIG_KEYS.EMAIL_NOTIFICACIONES]: 'Email para notificaciones del sistema',
-    };
-
-    Object.entries(configs).forEach(([clave, valor]) => {
-      sheet.appendRow([clave, valor, descripciones[clave] ?? '', 'system', ahora]);
+    configs.forEach(([clave, valor, desc]) => {
+      sheet.appendRow([clave, valor, desc, 'system', ahora]);
     });
 
     AppLogger.info('Setup', 'Configuración por defecto insertada.');
+  }
+
+  /**
+   * Crea el Google Form de registro de rutas y lo vincula al Spreadsheet.
+   * Ejecutar UNA SOLA VEZ después de initialize().
+   * Guarda el ID del form en la hoja Configuracion.
+   */
+  export function crearFormulario(): void {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+
+    // Verificar si ya existe
+    const existingId = Environment.getFormId();
+    if (existingId) {
+      try {
+        const existing = FormApp.openById(existingId);
+        const msg = `El formulario ya existe.\n\nURL para choferes:\n${existing.getPublishedUrl()}`;
+        AppLogger.info('Setup', msg);
+        SpreadsheetApp.getUi().alert(msg);
+        return;
+      } catch (_) {
+        AppLogger.warn('Setup', 'Form ID en config no encontrado. Creando uno nuevo...');
+      }
+    }
+
+    const appNombre = Environment.getAppNombre();
+    const form = FormApp.create(`${appNombre} — Registro de Ruta`);
+
+    form.setDescription('Formulario para que los choferes registren sus rutas diarias.');
+    form.setCollectEmail(true);
+    form.setShowLinkToRespondAgain(true);
+    form.setConfirmationMessage('¡Registro enviado correctamente! Será revisado por el administrador.');
+
+    // Pregunta 1: Fecha del recorrido
+    form.addDateItem()
+      .setTitle('Fecha del recorrido')
+      .setRequired(true);
+
+    // Pregunta 2: Placa del camión
+    (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
+      .setTitle('Placa del camión')
+      .setRequired(true)
+      .setHelpText('Ingrese la placa en mayúsculas. Ej: ABC-1234');
+
+    // Pregunta 3: Tipo de ruta
+    form.addMultipleChoiceItem()
+      .setTitle('Tipo de ruta')
+      .setChoiceValues(['URBANA', 'RURAL'])
+      .setRequired(true);
+
+    // Pregunta 4: Observaciones (opcional)
+    form.addParagraphTextItem()
+      .setTitle('Observaciones')
+      .setRequired(false)
+      .setHelpText('Opcional: novedades del recorrido');
+
+    // Vincular al Spreadsheet actual (crea hoja "Form Responses 1")
+    form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+
+    // Guardar el ID en Configuracion
+    _setConfigValue(ss, Constants.CONFIG_KEYS.FORM_ID, form.getId());
+    Environment.clearCache();
+
+    const url = form.getPublishedUrl();
+    AppLogger.info('Setup', `Formulario creado: ${url}`);
+    SpreadsheetApp.getUi().alert(
+      `✅ Formulario creado exitosamente.\n\n` +
+      `URL para compartir con los choferes:\n${url}\n\n` +
+      `Próximo paso: ejecuta installTriggers() para activar el procesamiento automático.`
+    );
+  }
+
+  function _setConfigValue(
+    ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+    clave: string,
+    valor: string
+  ): void {
+    const sheet = ss.getSheetByName(Constants.SHEETS.CONFIGURACION);
+    if (!sheet) return;
+
+    const data = sheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][Constants.COLS.CONFIGURACION.CLAVE]) === clave) {
+        sheet.getRange(i + 1, Constants.COLS.CONFIGURACION.VALOR + 1).setValue(valor);
+        sheet.getRange(i + 1, Constants.COLS.CONFIGURACION.FECHA_MODIFICACION + 1)
+          .setValue(new Date().toISOString());
+        return;
+      }
+    }
+    // Si no existe la fila, la agrega
+    sheet.appendRow([clave, valor, '', 'setup', new Date().toISOString()]);
   }
 
   function insertarTarifasIniciales(

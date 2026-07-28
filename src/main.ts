@@ -45,6 +45,12 @@ function initializeSheets(): void {
   Setup.initialize();
 }
 
+/** Crea el Google Form y lo vincula al Spreadsheet. Ejecutar UNA SOLA VEZ. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function setupForm(): void {
+  Setup.crearFormulario();
+}
+
 /** Instala el trigger del formulario. Ejecutar UNA SOLA VEZ. */
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function installTriggers(): void {
