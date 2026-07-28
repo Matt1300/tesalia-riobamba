@@ -242,8 +242,12 @@
       crear:       function(dto) { return API.call('tarifas.crear', dto); },
     },
     reportes: {
-      resumenPeriodo:function(f)         { return API.call('reportes.resumenPeriodo', f); },
-      reporteChofer: function(cId, f)    { return API.call('reportes.reporteChofer', Object.assign({ choferId: cId }, f)); },
+      resumenPeriodo:      function(f)      { return API.call('reportes.resumenPeriodo', f); },
+      reporteChofer:       function(cId, f) { return API.call('reportes.reporteChofer', Object.assign({ choferId: cId }, f)); },
+      detalleChofer:       function(cId, f) { return API.call('reportes.detalleChofer', Object.assign({ choferId: cId }, f)); },
+      exportarExcelChofer: function(cId, f) { return API.call('reportes.exportarExcelChofer', Object.assign({ choferId: cId }, f)); },
+      exportarPdfChofer:   function(cId, f) { return API.call('reportes.exportarPdf', Object.assign({ choferId: cId }, f)); },
+      exportarExcel:       function(f)      { return API.call('reportes.exportarExcel', f); },
     },
     usuarios: {
       getAll:    function()        { return API.call('usuarios.getAll'); },
@@ -441,43 +445,93 @@
 
   /* ─── Dashboard ──────────────────────────────────────────────────────────── */
   function makeDashboardPage() {
+    var _choferes = [], _camiones = [];
+
+    function _render(container, anio, mes, choferId) {
+      var monthName = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+      var statsEl  = container.querySelector('#db-stats');
+      var tableEl  = container.querySelector('#db-table');
+      if (!statsEl || !tableEl) return;
+
+      statsEl.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div></div>';
+      tableEl.innerHTML = '';
+
+      if (choferId) {
+        // Vista individual: reporte del chofer
+        API.reportes.reporteChofer(choferId, { anio: anio, mes: mes })
+          .then(function(d) {
+            var nombre = d.chofer ? d.chofer.nombre : choferId;
+            statsEl.innerHTML =
+              '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + d.totalRegistros + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(d.montoTotal) + '</div><div class="stat-sub">' + nombre + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Rutas Urbanas</div><div class="stat-value" style="color:var(--primary)">' + d.totalUrbanas + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Rutas Rurales</div><div class="stat-value" style="color:var(--danger)">' + d.totalRurales + '</div></div>';
+            tableEl.innerHTML = '<div class="card"><div class="card-title">Resumen &mdash; ' + nombre + ' &mdash; ' + monthName + '</div>' +
+              '<div class="empty-state" style="padding:20px"><p>Ver detalle completo en la secci\u00f3n <strong>Reportes</strong></p></div></div>';
+          })
+          .catch(function(e) { UI.showError(statsEl, e.message); });
+      } else {
+        // Vista global
+        Promise.all([
+          API.registros.filtrar({ anio: anio, mes: mes }),
+        ]).then(function(r) {
+          var registros = r[0];
+          var actChoferes = _choferes.filter(function(c) { return c.activo; }).length;
+          var actCamiones = _camiones.filter(function(c) { return c.activo; }).length;
+          var totalMonto  = registros.reduce(function(s, x) { return s + (x.tarifaAplicada || 0); }, 0);
+          var pendientes  = registros.filter(function(x) { return x.estado === 'PENDIENTE'; }).length;
+
+          statsEl.innerHTML =
+            '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + registros.length + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Monto total del mes</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' + actChoferes + '</div><div class="stat-sub">de ' + _choferes.length + ' total</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' + actCamiones + '</div><div class="stat-sub">de ' + _camiones.length + ' total</div></div>' +
+            '<div class="stat-card"><div class="stat-label">Pendientes de validar</div><div class="stat-value" style="color:var(--warning)">' + pendientes + '</div><div class="stat-sub">del mes actual</div></div>';
+
+          var rows = registros.slice(0, 10).map(function(reg) {
+            return '<tr><td>' + UI.formatDate(reg.fecha) + '</td><td>' + UI.choferName(_choferes, reg.choferId) +
+              '</td><td>' + UI.camionPatente(_camiones, reg.camionId) + '</td><td>' + UI.rutaBadge(reg.tipoRuta) +
+              '</td><td>' + UI.formatCurrency(reg.tarifaAplicada) + '</td><td>' + UI.statusBadge(reg.estado) + '</td></tr>';
+          }).join('');
+          tableEl.innerHTML = '<div class="card"><div class="card-title">&#218;ltimos registros del mes</div>' +
+            (registros.length === 0
+              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros este mes</p></div>'
+              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
+            ) + '</div>';
+        }).catch(function(e) { UI.showError(statsEl, e.message); });
+      }
+    }
+
     return {
       title: 'Dashboard',
       render: function(container) {
         UI.showLoading(container);
         var ym = currentYearMonth();
-        Promise.all([
-          API.choferes.getAll(),
-          API.camiones.getAll(),
-          API.registros.filtrar({ anio: ym.anio, mes: ym.mes }),
-        ]).then(function(r) {
-          var choferes = r[0], camiones = r[1], registros = r[2];
-          var actChoferes = choferes.filter(function(c) { return c.activo; }).length;
-          var actCamiones = camiones.filter(function(c) { return c.activo; }).length;
-          var totalMonto  = registros.reduce(function(s, x) { return s + (x.tarifaAplicada || 0); }, 0);
-          var pendientes  = registros.filter(function(x) { return x.estado === 'PENDIENTE'; }).length;
-          var monthName   = new Date(ym.anio, ym.mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
-
-          var rows = registros.slice(0, 10).map(function(r) {
-            return '<tr><td>' + UI.formatDate(r.fecha) + '</td><td>' + UI.choferName(choferes, r.choferId) +
-              '</td><td>' + UI.camionPatente(camiones, r.camionId) + '</td><td>' + UI.rutaBadge(r.tipoRuta) +
-              '</td><td>' + UI.formatCurrency(r.tarifaAplicada) + '</td><td>' + UI.statusBadge(r.estado) + '</td></tr>';
-          }).join('');
-
-          container.innerHTML =
-            '<div class="cards-grid">' +
-              '<div class="stat-card"><div class="stat-label">Registros del mes</div><div class="stat-value">' + registros.length + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Monto total del mes</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' + actChoferes + '</div><div class="stat-sub">de ' + choferes.length + ' total</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' + actCamiones + '</div><div class="stat-sub">de ' + camiones.length + ' total</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Pendientes de validar</div><div class="stat-value" style="color:var(--warning)">' + pendientes + '</div><div class="stat-sub">del mes actual</div></div>' +
-            '</div>' +
-            '<div class="card"><div class="card-title">&#218;ltimos registros del mes</div>' +
-            (registros.length === 0
-              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros este mes</p></div>'
-              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' + rows + '</tbody></table></div>'
-            ) + '</div>';
-        }).catch(function(e) { UI.showError(container, e.message); });
+        Promise.all([API.choferes.getAll(), API.camiones.getAll()])
+          .then(function(r) {
+            _choferes = r[0]; _camiones = r[1];
+            var choferOpts = '<option value="">Todos los choferes</option>' +
+              _choferes.filter(function(c) { return c.activo; }).map(function(c) {
+                return '<option value="' + c.choferId + '">' + c.nombre + '</option>';
+              }).join('');
+            container.innerHTML =
+              '<div class="card" style="margin-bottom:16px"><div class="filter-bar">' +
+              '<select class="form-control" id="db-mes">' + monthOptions(ym.mes) + '</select>' +
+              '<select class="form-control" id="db-anio">' + yearOptions(ym.anio) + '</select>' +
+              '<select class="form-control" id="db-chofer">' + choferOpts + '</select>' +
+              '<button class="btn btn-primary" id="db-filtrar">Actualizar</button>' +
+              '</div></div>' +
+              '<div class="cards-grid" id="db-stats"></div>' +
+              '<div id="db-table"></div>';
+            container.querySelector('#db-filtrar').onclick = function() {
+              var a = parseInt(container.querySelector('#db-anio').value);
+              var m = parseInt(container.querySelector('#db-mes').value);
+              var c = container.querySelector('#db-chofer').value;
+              _render(container, a, m, c || null);
+            };
+            _render(container, ym.anio, ym.mes, null);
+          })
+          .catch(function(e) { UI.showError(container, e.message); });
       }
     };
   }
@@ -639,50 +693,122 @@
 
   /* ─── Reportes ───────────────────────────────────────────────────────────── */
   function makeReportesPage() {
+    function _downloadBase64(result) {
+      var a = document.createElement('a');
+      a.href = 'data:' + result.mimeType + ';base64,' + result.base64;
+      a.download = result.filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function _openDetalle(choferId, nombre, filtro) {
+      Modal.show({ title: 'Detalle &mdash; ' + nombre, body: '<div class="empty-state"><div class="loading-spinner"></div><p>Cargando...</p></div>' });
+      API.reportes.detalleChofer(choferId, filtro)
+        .then(function(d) {
+          var regRows = d.registros.map(function(r) {
+            return '<tr><td>' + r.fecha + '</td><td>' + r.camionPatente + '</td><td>' + UI.rutaBadge(r.tipoRuta) +
+              '</td><td style="text-align:right">' + UI.formatCurrency(r.tarifaAplicada) +
+              '</td><td>' + UI.statusBadge(r.estado) + '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.observaciones||'-') + '</td></tr>';
+          }).join('');
+          var body =
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
+              '<div class="stat-card" style="padding:12px"><div class="stat-label">Total</div><div class="stat-value" style="font-size:22px">' + d.totalRegistros + '</div></div>' +
+              '<div class="stat-card" style="padding:12px"><div class="stat-label">Urbanas</div><div class="stat-value" style="font-size:22px;color:var(--primary)">' + d.totalUrbanas + '</div></div>' +
+              '<div class="stat-card" style="padding:12px"><div class="stat-label">Rurales</div><div class="stat-value" style="font-size:22px;color:var(--danger)">' + d.totalRurales + '</div></div>' +
+              '<div class="stat-card" style="padding:12px"><div class="stat-label">Monto</div><div class="stat-value" style="font-size:18px">' + UI.formatCurrency(d.montoTotal) + '</div></div>' +
+            '</div>' +
+            (d.registros.length === 0
+              ? '<div class="empty-state"><p>Sin registros en este per\u00edodo</p></div>'
+              : '<div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Fecha</th><th>Cami\u00f3n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' + regRows + '</tbody></table></div>'
+            );
+          if (Modal._el) Modal._el.querySelector('.modal-body').innerHTML = body;
+        })
+        .catch(function(e) { if (Modal._el) Modal._el.querySelector('.modal-body').innerHTML = '<p style="color:var(--danger)">' + e.message + '</p>'; });
+    }
+
     function _loadReporte(el, anio, mes) {
+      var filtro = { anio: anio, mes: mes };
       UI.showLoading(el);
-      API.reportes.resumenPeriodo({ anio: anio, mes: mes })
+      API.reportes.resumenPeriodo(filtro)
         .then(function(data) {
-          var items = Array.isArray(data) ? data : (data ? [data] : []);
-          if (items.length === 0) {
+          var porChofer = (data && data.porChofer) ? data.porChofer : [];
+          if (!data || porChofer.length === 0) {
             el.innerHTML = '<div class="card"><div class="empty-state"><div class="empty-state-icon">&#128202;</div><p>Sin datos para el per&#237;odo seleccionado</p></div></div>';
             return;
           }
-          var totalMonto   = items.reduce(function(s,r) { return s+(r.montoTotal||0); }, 0);
-          var totalReg     = items.reduce(function(s,r) { return s+(r.totalRegistros||0); }, 0);
-          var totalUrbanas = items.reduce(function(s,r) { return s+(r.totalUrbanas||0); }, 0);
-          var totalRurales = items.reduce(function(s,r) { return s+(r.totalRurales||0); }, 0);
-          var monthName = new Date(anio, mes-1).toLocaleString('es-EC', { month:'long', year:'numeric' });
-          var rows = items.map(function(r) {
-            var nombre = r.chofer ? r.chofer.nombre : (r.choferId || '-');
-            return '<tr><td>' + nombre + '</td><td style="text-align:center">' + (r.totalRegistros||0) +
-              '</td><td style="text-align:center">' + (r.totalUrbanas||0) +
-              '</td><td style="text-align:center">' + (r.totalRurales||0) +
-              '</td><td style="text-align:right;font-weight:500">' + UI.formatCurrency(r.montoTotal) + '</td></tr>';
+          var monthName = new Date(anio, mes - 1).toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+          var rows = porChofer.map(function(r) {
+            var nombre = r.chofer ? r.chofer.nombre : '-';
+            var cId    = r.chofer ? r.chofer.choferId : '';
+            return '<tr>' +
+              '<td><strong>' + nombre + '</strong></td>' +
+              '<td style="text-align:center">' + (r.totalRegistros||0) + '</td>' +
+              '<td style="text-align:center">' + (r.totalUrbanas||0) + '</td>' +
+              '<td style="text-align:center">' + (r.totalRurales||0) + '</td>' +
+              '<td style="text-align:right;font-weight:500">' + UI.formatCurrency(r.montoTotal) + '</td>' +
+              '<td><div class="action-btns">' +
+                '<button class="btn-icon btn-detalle" data-id="' + cId + '" data-nombre="' + nombre + '" title="Ver detalle">&#128203;</button>' +
+                '<button class="btn-icon btn-excel" data-id="' + cId + '" data-nombre="' + nombre + '" title="Exportar Excel">&#128196;</button>' +
+                '<button class="btn-icon btn-pdf" data-id="' + cId + '" data-nombre="' + nombre + '" title="Exportar PDF">&#128196;PDF</button>' +
+              '</div></td>' +
+            '</tr>';
           }).join('');
           el.innerHTML =
             '<div class="cards-grid" style="margin-bottom:16px">' +
-              '<div class="stat-card"><div class="stat-label">Total Registros</div><div class="stat-value">' + totalReg + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Monto Total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(totalMonto) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
-              '<div class="stat-card"><div class="stat-label">Choferes con actividad</div><div class="stat-value">' + items.length + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Total Registros</div><div class="stat-value">' + data.totalRegistros + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Monto Total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(data.montoTotal) + '</div><div class="stat-sub">' + monthName + '</div></div>' +
+              '<div class="stat-card"><div class="stat-label">Choferes con actividad</div><div class="stat-value">' + porChofer.length + '</div></div>' +
             '</div>' +
-            '<div class="card"><div class="card-title">Resumen por Chofer &mdash; ' + monthName + '</div>' +
+            '<div class="card"><div class="toolbar" style="margin-bottom:8px"><div class="card-title" style="margin-bottom:0">Resumen por Chofer &mdash; ' + monthName + '</div>' +
+            '<button class="btn btn-secondary btn-export-all" id="btn-export-all">&#128196; Exportar Todo Excel</button></div>' +
             '<div class="table-wrapper"><table>' +
-              '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Urbanas</th><th style="text-align:center">Rurales</th><th style="text-align:right">Monto</th></tr></thead>' +
+              '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Urbanas</th><th style="text-align:center">Rurales</th><th style="text-align:right">Monto</th><th>Acciones</th></tr></thead>' +
               '<tbody>' + rows + '</tbody>' +
-              '<tfoot><tr><td>TOTAL</td><td style="text-align:center">' + totalReg + '</td><td style="text-align:center">' + totalUrbanas + '</td><td style="text-align:center">' + totalRurales + '</td><td style="text-align:right">' + UI.formatCurrency(totalMonto) + '</td></tr></tfoot>' +
+              '<tfoot><tr><td>TOTAL</td><td style="text-align:center">' + data.totalRegistros + '</td><td style="text-align:center">' + data.totalUrbanas + '</td><td style="text-align:center">' + data.totalRurales + '</td><td style="text-align:right">' + UI.formatCurrency(data.montoTotal) + '</td><td></td></tr></tfoot>' +
             '</table></div></div>';
+
+          // Botón exportar todo
+          el.querySelector('#btn-export-all').onclick = function() {
+            var btn = el.querySelector('#btn-export-all');
+            btn.disabled = true; btn.textContent = 'Generando...';
+            API.reportes.exportarExcel(filtro)
+              .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); btn.disabled = false; btn.textContent = '&#128196; Exportar Todo Excel'; })
+              .catch(function(e) { Toast.error(e.message); btn.disabled = false; btn.textContent = '&#128196; Exportar Todo Excel'; });
+          };
+
+          // Botones por fila
+          el.querySelectorAll('.btn-detalle').forEach(function(btn) {
+            btn.onclick = function() { _openDetalle(btn.dataset.id, btn.dataset.nombre, filtro); };
+          });
+          el.querySelectorAll('.btn-excel').forEach(function(btn) {
+            btn.onclick = function() {
+              var b = btn; b.disabled = true; b.textContent = '...';
+              API.reportes.exportarExcelChofer(b.dataset.id, filtro)
+                .then(function(res) { _downloadBase64(res); Toast.success('Excel descargado'); b.disabled = false; b.textContent = '&#128196;'; })
+                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = '&#128196;'; });
+            };
+          });
+          el.querySelectorAll('.btn-pdf').forEach(function(btn) {
+            btn.onclick = function() {
+              var b = btn; b.disabled = true; b.textContent = '...';
+              API.reportes.exportarPdfChofer(b.dataset.id, filtro)
+                .then(function(res) { _downloadBase64(res); Toast.success('PDF descargado'); b.disabled = false; b.textContent = '&#128196;PDF'; })
+                .catch(function(e) { Toast.error(e.message); b.disabled = false; b.textContent = '&#128196;PDF'; });
+            };
+          });
         })
         .catch(function(e) { UI.showError(el, e.message); });
     }
+
     return {
       title: 'Reportes',
       render: function(container) {
         var ym = currentYearMonth();
         container.innerHTML =
           '<div class="card" style="margin-bottom:16px"><div class="toolbar"><div class="filter-bar">' +
-          '<select class="form-control" id="r-anio">' + yearOptions(ym.anio) + '</select>' +
           '<select class="form-control" id="r-mes">' + monthOptions(ym.mes) + '</select>' +
+          '<select class="form-control" id="r-anio">' + yearOptions(ym.anio) + '</select>' +
           '<button class="btn btn-primary" id="btn-generar">Generar Reporte</button>' +
           '</div></div></div><div id="reporte-body"></div>';
         container.querySelector('#btn-generar').onclick = function() {

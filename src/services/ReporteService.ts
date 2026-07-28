@@ -105,4 +105,73 @@ namespace ReporteService {
       periodo,
     };
   }
+
+  export interface DetalleRegistro {
+    registroId: string;
+    fecha: string;
+    camionPatente: string;
+    camionModelo: string;
+    tipoRuta: Models.TipoRuta;
+    tarifaAplicada: number;
+    estado: Models.EstadoRegistro;
+    observaciones: string;
+  }
+
+  export interface DetalleChofer {
+    chofer: Models.Chofer;
+    periodo: string;
+    totalRegistros: number;
+    totalUrbanas: number;
+    totalRurales: number;
+    montoTotal: number;
+    registros: DetalleRegistro[];
+  }
+
+  /** Detalle completo de registros de un chofer en un período. */
+  export function getDetalleChofer(
+    choferId: string,
+    filtro: DTO.FiltroReporteDTO,
+    session: Auth.UserSession
+  ): DetalleChofer {
+    RoleGuard.requireOwnDataOrAdmin(session, choferId);
+
+    const chofer = ChoferesRepository.findById(choferId);
+    if (!chofer) throw new Error(`Chofer ${choferId} no encontrado.`);
+
+    const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId })
+      .filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
+
+    const camionesMap = new Map<string, Models.Camion>();
+    CamionesRepository.findAll().forEach(c => camionesMap.set(c.camionId, c));
+
+    const periodo = filtro.anio && filtro.mes
+      ? `${DateUtils.monthName(filtro.mes)} ${filtro.anio}`
+      : filtro.fechaDesde && filtro.fechaHasta
+        ? `${filtro.fechaDesde} - ${filtro.fechaHasta}`
+        : 'Todo el período';
+
+    const detalleRegistros: DetalleRegistro[] = registros.map(r => {
+      const camion = camionesMap.get(r.camionId);
+      return {
+        registroId: r.registroId,
+        fecha: DateUtils.toISODate(r.fecha),
+        camionPatente: camion ? camion.patente : r.camionId,
+        camionModelo: camion ? camion.modelo : '',
+        tipoRuta: r.tipoRuta,
+        tarifaAplicada: r.tarifaAplicada,
+        estado: r.estado,
+        observaciones: r.observaciones,
+      };
+    });
+
+    return {
+      chofer,
+      periodo,
+      totalRegistros: registros.length,
+      totalUrbanas: registros.filter(r => r.tipoRuta === Models.TipoRuta.URBANA).length,
+      totalRurales: registros.filter(r => r.tipoRuta === Models.TipoRuta.RURAL).length,
+      montoTotal: NumberUtils.round2(registros.reduce((s, r) => s + r.tarifaAplicada, 0)),
+      registros: detalleRegistros,
+    };
+  }
 }

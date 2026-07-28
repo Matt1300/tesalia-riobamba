@@ -16,9 +16,19 @@ namespace ReporteController {
             ReporteService.getReporteChofer(p['choferId'] as string, filtro, session)
           );
 
+        case 'detalleChofer':
+          return API.ok(
+            ReporteService.getDetalleChofer(p['choferId'] as string, filtro, session)
+          );
+
         case 'exportarPdf':
           return API.ok(
             ExportService.exportarPdfChofer(p['choferId'] as string, filtro, session)
+          );
+
+        case 'exportarExcelChofer':
+          return API.ok(
+            ExportService.exportarExcelChofer(p['choferId'] as string, filtro, session)
           );
 
         case 'exportarExcel':
