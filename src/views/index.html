@@ -281,8 +281,19 @@
     _render: function() {
       var path = window.location.hash.slice(1) || 'dashboard';
       var renderer = this.routes[path];
-      var content = document.getElementById('content');
-      if (!content) return;
+
+      // Reemplazar el elemento #content en cada navegación.
+      // Los callbacks async pendientes de la página anterior siguen
+      // referenciando el elemento viejo (ahora desconectado del DOM),
+      // así sus escrituras son invisibles y no afectan la nueva página.
+      var old = document.getElementById('content');
+      var content = document.createElement('main');
+      content.className = 'content';
+      content.id = 'content';
+      if (old) {
+        old.parentNode.replaceChild(content, old);
+      }
+
       document.querySelectorAll('.nav-item').forEach(function(el) {
         el.classList.toggle('active', el.dataset.route === path);
       });
