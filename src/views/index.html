@@ -693,6 +693,8 @@
         <h2>Sin acceso</h2>
         <p>Su cuenta no tiene acceso al sistema.</p>
         <p>Contacte al administrador para solicitar acceso.</p>
+        <p style="margin-top:16px;font-size:12px;color:#999">Email detectado: <strong id="debug-email">cargando...</strong></p>
+        <script>document.getElementById('debug-email').textContent = window.__DEBUG_EMAIL__ || '(vacío)';</script>
       </div>
     </template>
 
