@@ -12,7 +12,7 @@ namespace CamionesRepository {
       modelo: String(row[C.MODELO]),
       anio: NumberUtils.fromSheetInt(row[C.ANIO]),
       choferId: String(row[C.CHOFER_ID]),
-      activo: row[C.ACTIVO] === true || row[C.ACTIVO] === 'TRUE',
+      activo: row[C.ACTIVO] === true || String(row[C.ACTIVO]).toUpperCase() === 'TRUE' || row[C.ACTIVO] === 1 || String(row[C.ACTIVO]).toUpperCase() === 'VERDADERO',
       notas: String(row[C.NOTAS] ?? ''),
     };
   }

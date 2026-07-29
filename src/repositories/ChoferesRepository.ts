@@ -12,7 +12,7 @@ namespace ChoferesRepository {
       telefono: String(row[C.TELEFONO]),
       dni: String(row[C.DNI]),
       fechaIngreso: DateUtils.fromSheetValue(row[C.FECHA_INGRESO]),
-      activo: row[C.ACTIVO] === true || row[C.ACTIVO] === 'TRUE',
+      activo: row[C.ACTIVO] === true || String(row[C.ACTIVO]).toUpperCase() === 'TRUE' || row[C.ACTIVO] === 1 || String(row[C.ACTIVO]).toUpperCase() === 'VERDADERO',
       notas: String(row[C.NOTAS] ?? ''),
     };
   }

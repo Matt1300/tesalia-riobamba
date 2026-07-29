@@ -16,7 +16,7 @@ namespace TarifasRepository {
       fechaVencimiento: row[C.FECHA_VENCIMIENTO]
         ? DateUtils.fromSheetValue(row[C.FECHA_VENCIMIENTO])
         : null,
-      activo: row[C.ACTIVO] === true || row[C.ACTIVO] === 'TRUE',
+      activo: row[C.ACTIVO] === true || String(row[C.ACTIVO]).toUpperCase() === 'TRUE' || row[C.ACTIVO] === 1 || String(row[C.ACTIVO]).toUpperCase() === 'VERDADERO',
       creadoPor: String(row[C.CREADO_POR]),
       fechaCreacion: DateUtils.fromSheetValue(row[C.FECHA_CREACION]),
     };

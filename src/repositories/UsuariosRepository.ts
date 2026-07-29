@@ -12,7 +12,7 @@ namespace UsuariosRepository {
       correo: String(row[C.CORREO]),
       rol: String(row[C.ROL]) as Models.Rol,
       choferId: row[C.CHOFER_ID] ? String(row[C.CHOFER_ID]) : null,
-      activo: row[C.ACTIVO] === true || row[C.ACTIVO] === 'TRUE',
+      activo: row[C.ACTIVO] === true || String(row[C.ACTIVO]).toUpperCase() === 'TRUE' || row[C.ACTIVO] === 1 || String(row[C.ACTIVO]).toUpperCase() === 'VERDADERO',
       fechaCreacion: DateUtils.fromSheetValue(row[C.FECHA_CREACION]),
       ultimoAcceso: row[C.ULTIMO_ACCESO] ? DateUtils.fromSheetValue(row[C.ULTIMO_ACCESO]) : null,
     };
