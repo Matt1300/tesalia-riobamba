@@ -25,6 +25,7 @@ namespace FormTrigger {
       AppLogger.error('FormTrigger', 'Error al procesar respuesta del form', err);
       const msg = err instanceof Error ? err.message : String(err);
       _marcarEstado(e, 'ERROR', msg);
+      _guardarError(e, emailChofer, msg);
       _notificarAdmin_Error(err);
       _notificarChofer_Error(emailChofer, err);
     }
@@ -68,6 +69,31 @@ namespace FormTrigger {
       sheet.getRange(row, estadoCol + 2).setValue(new Date());
     } catch (writeErr) {
       AppLogger.warn('FormTrigger', 'No se pudo escribir estado en la hoja de respuestas');
+    }
+  }
+
+  function _guardarError(
+    e: GoogleAppsScript.Events.SheetsOnFormSubmit,
+    emailChofer: string,
+    mensajeError: string
+  ): void {
+    try {
+      const usuario = emailChofer ? UsuariosRepository.findByEmail(emailChofer) : null;
+      const formError: Models.FormError = {
+        errorId: IdGenerator.uuid(),
+        timestamp: new Date(),
+        emailChofer,
+        choferId: usuario?.choferId ?? null,
+        rawValues: JSON.stringify(e.values),
+        mensajeError,
+        estado: Models.EstadoFormError.PENDIENTE,
+        resueltoEn: null,
+        resueltoPor: null,
+        registroId: null,
+      };
+      FormErroresRepository.append(formError);
+    } catch (saveErr) {
+      AppLogger.warn('FormTrigger', 'No se pudo guardar el error en FormErrores');
     }
   }
 

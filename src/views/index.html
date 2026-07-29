@@ -848,6 +848,17 @@
             return API.call("auditoria.getByUsuario", { email: email });
           },
         },
+        formErrores: {
+          getAll: function () {
+            return API.call("formErrores.getAll");
+          },
+          ignorar: function (errorId) {
+            return API.call("formErrores.ignorar", { errorId: errorId });
+          },
+          marcarResuelto: function (errorId, registroId) {
+            return API.call("formErrores.marcarResuelto", { errorId: errorId, registroId: registroId });
+          },
+        },
       };
 
       /* ─── Router ─────────────────────────────────────────────────────────────── */
@@ -1173,7 +1184,8 @@
   ═══════════════════════════════════════════════════════════════════════════ */
 
       /* ─── Dashboard ──────────────────────────────────────────────────────────── */
-      function makeDashboardPage() {
+      function makeDashboardPage(session) {
+        var isAdmin = session.rol === "ADMIN";
         var _choferes = [],
           _camiones = [];
 
@@ -1238,7 +1250,7 @@
                 pendientes +
                 "</div></div>";
 
-              if (!filtro.choferId) {
+              if (isAdmin && !filtro.choferId) {
                 statsCards +=
                   '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' +
                   actChoferes +
@@ -1312,22 +1324,21 @@
               .then(function (r) {
                 _choferes = r[0];
                 _camiones = r[1];
-                var choferOpts =
-                  '<option value="">Todos los choferes</option>' +
-                  _choferes
-                    .filter(function (c) {
-                      return c.activo;
-                    })
-                    .map(function (c) {
-                      return (
-                        '<option value="' +
-                        c.choferId +
-                        '">' +
-                        c.nombre +
-                        "</option>"
-                      );
-                    })
-                    .join("");
+                var choferFilterHtml = "";
+                if (isAdmin) {
+                  var choferOpts =
+                    '<option value="">Todos los choferes</option>' +
+                    _choferes
+                      .filter(function (c) { return c.activo; })
+                      .map(function (c) {
+                        return (
+                          '<option value="' + c.choferId + '">' + c.nombre + "</option>"
+                        );
+                      })
+                      .join("");
+                  choferFilterHtml =
+                    '<select class="form-control" id="db-chofer">' + choferOpts + "</select>";
+                }
                 container.innerHTML =
                   '<div class="card" style="margin-bottom:16px"><div class="filter-bar">' +
                   '<select class="form-control" id="db-mes">' +
@@ -1336,9 +1347,7 @@
                   '<select class="form-control" id="db-anio">' +
                   yearOptions(ym.anio) +
                   "</select>" +
-                  '<select class="form-control" id="db-chofer">' +
-                  choferOpts +
-                  "</select>" +
+                  choferFilterHtml +
                   '<select class="form-control" id="db-estado">' +
                   '<option value="">Todos los estados</option>' +
                   '<option value="PENDIENTE">Pendiente</option>' +
@@ -1350,13 +1359,12 @@
                   '<div class="cards-grid" id="db-stats"></div>' +
                   '<div id="db-table"></div>';
                 container.querySelector("#db-filtrar").onclick = function () {
+                  var choferEl = container.querySelector("#db-chofer");
                   var filtro = {
                     anio: parseInt(container.querySelector("#db-anio").value),
                     mes: parseInt(container.querySelector("#db-mes").value),
-                    choferId:
-                      container.querySelector("#db-chofer").value || undefined,
-                    estado:
-                      container.querySelector("#db-estado").value || undefined,
+                    choferId: choferEl ? choferEl.value || undefined : undefined,
+                    estado: container.querySelector("#db-estado").value || undefined,
                   };
                   _render(container, filtro);
                 };
@@ -1396,21 +1404,22 @@
         }
 
         function _renderPage(container) {
-          var choferOpts =
-            '<option value="">Todos los choferes</option>' +
-            _choferes
-              .map(function (c) {
-                return (
-                  '<option value="' +
-                  c.choferId +
-                  '"' +
-                  (_filtro.choferId === c.choferId ? " selected" : "") +
-                  ">" +
-                  c.nombre +
-                  "</option>"
-                );
-              })
-              .join("");
+          var choferOpts = isAdmin
+            ? '<option value="">Todos los choferes</option>' +
+              _choferes
+                .map(function (c) {
+                  return (
+                    '<option value="' +
+                    c.choferId +
+                    '"' +
+                    (_filtro.choferId === c.choferId ? " selected" : "") +
+                    ">" +
+                    c.nombre +
+                    "</option>"
+                  );
+                })
+                .join("")
+            : "";
 
           var rows = _data
             .map(function (r) {
@@ -1458,6 +1467,9 @@
             })
             .join("");
 
+          var choferSelectHtml = isAdmin
+            ? '<select class="form-control" id="f-chofer">' + choferOpts + "</select>"
+            : "";
           container.innerHTML =
             '<div class="card" style="margin-bottom:16px"><div class="toolbar">' +
             '<div class="filter-bar">' +
@@ -1467,9 +1479,7 @@
             '<input type="date" class="form-control" id="f-hasta" value="' +
             (_filtro.fechaHasta || "") +
             '">' +
-            '<select class="form-control" id="f-chofer">' +
-            choferOpts +
-            "</select>" +
+            choferSelectHtml +
             '<select class="form-control" id="f-estado">' +
             '<option value="">Todos los estados</option>' +
             '<option value="PENDIENTE"' +
@@ -1485,7 +1495,7 @@
             '<button class="btn btn-secondary" id="btn-filtrar">Filtrar</button>' +
             '<button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>' +
             "</div>" +
-            '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>' +
+            (isAdmin ? '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>' : "") +
             "</div></div>" +
             '<div class="card"><div class="card-title">Registros (' +
             _data.length +
@@ -1498,21 +1508,23 @@
             "</div>";
 
           container.querySelector("#btn-filtrar").onclick = function () {
+            var choferEl = container.querySelector("#f-chofer");
             _load(container, {
-              fechaDesde:
-                container.querySelector("#f-desde").value || undefined,
-              fechaHasta:
-                container.querySelector("#f-hasta").value || undefined,
-              choferId: container.querySelector("#f-chofer").value || undefined,
+              fechaDesde: container.querySelector("#f-desde").value || undefined,
+              fechaHasta: container.querySelector("#f-hasta").value || undefined,
+              choferId: choferEl ? choferEl.value || undefined : undefined,
               estado: container.querySelector("#f-estado").value || undefined,
             });
           };
           container.querySelector("#btn-limpiar").onclick = function () {
             _load(container, {});
           };
-          container.querySelector("#btn-nuevo-reg").onclick = function () {
-            _openCreate(container);
-          };
+          var btnNuevo = container.querySelector("#btn-nuevo-reg");
+          if (btnNuevo) {
+            btnNuevo.onclick = function () {
+              _openCreate(container);
+            };
+          }
 
           container.querySelectorAll("[data-action]").forEach(function (btn) {
             btn.onclick = function () {
@@ -1713,7 +1725,8 @@
       }
 
       /* ─── Reportes ───────────────────────────────────────────────────────────── */
-      function makeReportesPage() {
+      function makeReportesPage(session) {
+        var isAdmin = session.rol === "ADMIN";
         function _downloadBase64(result) {
           var a = document.createElement("a");
           a.href = "data:" + result.mimeType + ";base64," + result.base64;
@@ -1777,6 +1790,70 @@
               if (Modal._el)
                 Modal._el.querySelector(".modal-body").innerHTML =
                   '<p style="color:var(--danger)">' + e.message + "</p>";
+            });
+        }
+
+        function _loadReporteChofer(el, anio, mes) {
+          if (!session.choferId) {
+            el.innerHTML = '<div class="card"><div class="empty-state"><p>No tiene un perfil de chofer asignado.</p></div></div>';
+            return;
+          }
+          var filtro = { anio: anio, mes: mes };
+          UI.showLoading(el);
+          API.reportes
+            .detalleChofer(session.choferId, filtro)
+            .then(function (d) {
+              var monthName = new Date(anio, mes - 1).toLocaleString("es-EC", {
+                month: "long",
+                year: "numeric",
+              });
+              var regRows = (d.registros || [])
+                .map(function (r) {
+                  return (
+                    "<tr><td>" + r.fecha + "</td><td>" + r.camionPatente +
+                    "</td><td>" + UI.rutaBadge(r.tipoRuta) +
+                    '</td><td style="text-align:right">' + UI.formatCurrency(r.tarifaAplicada) +
+                    "</td><td>" + UI.statusBadge(r.estado) +
+                    '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                    (r.observaciones || "-") + "</td></tr>"
+                  );
+                })
+                .join("");
+              el.innerHTML =
+                '<div class="cards-grid" style="margin-bottom:16px">' +
+                '<div class="stat-card"><div class="stat-label">Registros</div><div class="stat-value">' + d.totalRegistros + '</div><div class="stat-sub">' + monthName + "</div></div>" +
+                '<div class="stat-card"><div class="stat-label">Urbanas</div><div class="stat-value" style="color:var(--primary)">' + d.totalUrbanas + "</div></div>" +
+                '<div class="stat-card"><div class="stat-label">Rurales</div><div class="stat-value" style="color:var(--danger)">' + d.totalRurales + "</div></div>" +
+                '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(d.montoTotal) + '</div><div class="stat-sub">' + monthName + "</div></div>" +
+                "</div>" +
+                '<div class="card"><div class="toolbar" style="margin-bottom:8px"><div class="card-title" style="margin-bottom:0">Mis Registros &mdash; ' + monthName + "</div>" +
+                '<div class="action-btns">' +
+                '<button class="btn-icon btn-xls" id="btn-ch-xls" title="Descargar Excel">XLS</button>' +
+                '<button class="btn-icon btn-pdf-r" id="btn-ch-pdf" title="Descargar PDF">PDF</button>' +
+                "</div></div>" +
+                (d.registros.length === 0
+                  ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros en este per\u00edodo</p></div>'
+                  : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Cami\u00f3n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' +
+                    regRows + "</tbody></table></div>") +
+                "</div>";
+
+              el.querySelector("#btn-ch-xls").onclick = function () {
+                var b = el.querySelector("#btn-ch-xls");
+                b.disabled = true; b.textContent = "...";
+                API.reportes.exportarExcelChofer(session.choferId, filtro)
+                  .then(function (res) { _downloadBase64(res); Toast.success("Excel descargado"); b.disabled = false; b.textContent = "XLS"; })
+                  .catch(function (e) { Toast.error(e.message); b.disabled = false; b.textContent = "XLS"; });
+              };
+              el.querySelector("#btn-ch-pdf").onclick = function () {
+                var b = el.querySelector("#btn-ch-pdf");
+                b.disabled = true; b.textContent = "...";
+                API.reportes.exportarPdfChofer(session.choferId, filtro)
+                  .then(function (res) { _downloadBase64(res); Toast.success("PDF descargado"); b.disabled = false; b.textContent = "PDF"; })
+                  .catch(function (e) { Toast.error(e.message); b.disabled = false; b.textContent = "PDF"; });
+              };
+            })
+            .catch(function (e) {
+              UI.showError(el, e.message);
             });
         }
 
@@ -1950,6 +2027,7 @@
           title: "Reportes",
           render: function (container) {
             var ym = currentYearMonth();
+            var loader = isAdmin ? _loadReporte : _loadReporteChofer;
             container.innerHTML =
               '<div class="card" style="margin-bottom:16px"><div class="toolbar"><div class="filter-bar">' +
               '<select class="form-control" id="r-mes">' +
@@ -1963,13 +2041,9 @@
             container.querySelector("#btn-generar").onclick = function () {
               var a = parseInt(container.querySelector("#r-anio").value);
               var m = parseInt(container.querySelector("#r-mes").value);
-              _loadReporte(container.querySelector("#reporte-body"), a, m);
+              loader(container.querySelector("#reporte-body"), a, m);
             };
-            _loadReporte(
-              container.querySelector("#reporte-body"),
-              ym.anio,
-              ym.mes,
-            );
+            loader(container.querySelector("#reporte-body"), ym.anio, ym.mes);
           },
         };
       }
@@ -2706,6 +2780,176 @@
         };
       }
 
+      /* ─── Errores de Formulario ─────────────────────────────────────────────── */
+      function makeFormErroresPage(session) {
+        var isAdmin = session.rol === "ADMIN";
+        var _data = [];
+        var _choferes = [];
+        var _camiones = [];
+
+        function _estadoBadge(estado) {
+          if (estado === "PENDIENTE") return '<span class="badge" style="background:#fbbc04;color:#333">PENDIENTE</span>';
+          if (estado === "RESUELTO")  return '<span class="badge badge-activo">RESUELTO</span>';
+          if (estado === "IGNORADO")  return '<span class="badge badge-inactivo">IGNORADO</span>';
+          return '<span class="badge">' + estado + "</span>";
+        }
+
+        function _renderPage(container) {
+          var rows = _data
+            .map(function (e) {
+              var isPendiente = e.estado === "PENDIENTE";
+              var btns = "";
+              if (isAdmin && isPendiente) {
+                btns +=
+                  '<button class="btn-icon btn-det" data-action="crear" data-id="' + e.errorId + '" title="Crear registro manualmente">Crear</button>' +
+                  '<button class="btn-icon" style="background:#f1f3f4;color:#5f6368" data-action="ignorar" data-id="' + e.errorId + '" title="Ignorar este error">Ignorar</button>';
+              }
+              var rawObj = {};
+              try { rawObj = JSON.parse(e.rawValues || "[]"); } catch (_) {}
+              var rawResumen = Array.isArray(rawObj)
+                ? rawObj.slice(0, 6).join(" | ")
+                : e.rawValues;
+              return (
+                "<tr>" +
+                "<td>" + UI.formatDateTime(e.timestamp) + "</td>" +
+                "<td>" + (e.emailChofer || "-") + "</td>" +
+                '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + e.mensajeError + '">' + e.mensajeError + "</td>" +
+                '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:12px" title="' + rawResumen + '">' + rawResumen + "</td>" +
+                "<td>" + _estadoBadge(e.estado) + "</td>" +
+                (e.resueltoPor ? "<td>" + e.resueltoPor + "</td>" : "<td>-</td>") +
+                '<td><div class="action-btns">' + btns + "</div></td>" +
+                "</tr>"
+              );
+            })
+            .join("");
+
+          var pendientes = _data.filter(function (e) { return e.estado === "PENDIENTE"; }).length;
+          container.innerHTML =
+            '<div class="cards-grid" style="margin-bottom:16px">' +
+            '<div class="stat-card"><div class="stat-label">Total errores</div><div class="stat-value">' + _data.length + "</div></div>" +
+            '<div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-value" style="color:var(--warning)">' + pendientes + "</div></div>" +
+            "</div>" +
+            '<div class="card"><div class="card-title">Errores del Formulario</div>' +
+            (_data.length === 0
+              ? '<div class="empty-state"><div class="empty-state-icon">&#10003;</div><p>Sin errores pendientes</p></div>'
+              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer (email)</th><th>Error</th><th>Datos enviados</th><th>Estado</th><th>Resuelto por</th><th>Acciones</th></tr></thead><tbody>' +
+                rows + "</tbody></table></div>") +
+            "</div>";
+
+          container.querySelectorAll("[data-action]").forEach(function (btn) {
+            btn.onclick = function () {
+              var errorId = btn.dataset.id;
+              var err = _data.filter(function (x) { return x.errorId === errorId; })[0];
+              if (btn.dataset.action === "ignorar") _ignorar(container, errorId);
+              if (btn.dataset.action === "crear") _openCrear(container, err);
+            };
+          });
+        }
+
+        function _load(container) {
+          UI.showLoading(container);
+          var p = isAdmin
+            ? Promise.all([API.formErrores.getAll(), API.choferes.getAll(), API.camiones.getAll()])
+            : Promise.all([API.formErrores.getAll(), Promise.resolve([]), Promise.resolve([])]);
+          p.then(function (r) {
+            _data = r[0];
+            _choferes = r[1];
+            _camiones = r[2];
+            _renderPage(container);
+          }).catch(function (e) { UI.showError(container, e.message); });
+        }
+
+        function _ignorar(container, errorId) {
+          if (!confirm("&#191;Ignorar este error? Quedará marcado como IGNORADO.")) return;
+          API.formErrores.ignorar(errorId)
+            .then(function () { Toast.success("Marcado como ignorado"); _load(container); })
+            .catch(function (e) { Toast.error(e.message); });
+        }
+
+        function _openCrear(container, err) {
+          // Parsear rawValues para pre-rellenar campos
+          var rawArr = [];
+          try { rawArr = JSON.parse(err.rawValues || "[]"); } catch (_) {}
+          // Orden: [0]=timestamp, [1]=email, [2]=fecha, [3]=patente, [4]=tipoRuta, [5]=obs
+          var fechaRaw = rawArr[2] || "";
+          var tipoRutaRaw = (rawArr[4] || "URBANA").toUpperCase();
+          var obsRaw = rawArr[5] || "";
+          // Convertir fecha DD/MM/YYYY → YYYY-MM-DD
+          var fechaISO = fechaRaw;
+          var partes = fechaRaw.split("/");
+          if (partes.length === 3) fechaISO = partes[2] + "-" + partes[1].padStart(2,"0") + "-" + partes[0].padStart(2,"0");
+
+          var chSel = UI.choferOptions(_choferes, err.choferId || "");
+          var caSel = UI.camionOptions(_camiones, "");
+          var tipoU = tipoRutaRaw !== "RURAL";
+
+          Modal.show({
+            title: "Crear Registro desde Error",
+            body:
+              '<p style="margin-bottom:12px;color:var(--text-muted);font-size:13px">Error original: <em>' + err.mensajeError + "</em></p>" +
+              '<div class="form-row">' +
+              '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="fe-fecha" value="' + fechaISO + '"></div>' +
+              '<div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="fe-tipo"><option value="URBANA"' + (tipoU ? " selected" : "") + ">Urbana</option><option value=\"RURAL\"" + (!tipoU ? " selected" : "") + ">Rural</option></select></div>" +
+              '</div><div class="form-row">' +
+              '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="fe-chofer">' + chSel + "</select></div>" +
+              '<div class="form-group"><label class="form-label">Cami&#243;n *</label><select class="form-control" id="fe-camion">' + caSel + "</select></div>" +
+              '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="fe-obs" rows="2">' + obsRaw + "</textarea></div>",
+            onSave: function () {
+              var fecha = Modal.val("fe-fecha");
+              var choferId = Modal.val("fe-chofer");
+              var camionId = Modal.val("fe-camion");
+              if (!fecha || !choferId || !camionId) {
+                Toast.error("Completa todos los campos requeridos");
+                return;
+              }
+              Modal.setLoading(true);
+              API.registros.crear({
+                fecha: fecha,
+                choferId: choferId,
+                camionId: camionId,
+                tipoRuta: Modal.val("fe-tipo"),
+                observaciones: Modal.val("fe-obs") || undefined,
+                origen: "MANUAL",
+              })
+              .then(function (reg) {
+                return API.formErrores.marcarResuelto(err.errorId, reg.registroId);
+              })
+              .then(function () {
+                Modal.hide();
+                Toast.success("Registro creado y error marcado como resuelto");
+                _load(container);
+              })
+              .catch(function (e) {
+                Modal.setLoading(false);
+                Toast.error(e.message);
+              });
+            },
+          });
+
+          // Filtrar camiones al cambiar chofer
+          var choferSel = Modal._el.querySelector("#fe-chofer");
+          var camionSel = Modal._el.querySelector("#fe-camion");
+          function _updateCamiones() {
+            var cId = choferSel.value;
+            var filtrados = _camiones.filter(function (c) { return c.activo && c.choferId === cId; });
+            camionSel.innerHTML = filtrados.length > 0
+              ? filtrados.map(function (c) {
+                  return '<option value="' + c.camionId + '">' + c.patente + (c.modelo ? " &mdash; " + c.modelo : "") + "</option>";
+                }).join("")
+              : '<option value="">Sin cami&#243;n asignado</option>';
+          }
+          choferSel.addEventListener("change", _updateCamiones);
+          _updateCamiones();
+        }
+
+        return {
+          title: "Errores de Formulario",
+          render: function (container) {
+            _load(container);
+          },
+        };
+      }
+
       /* ─── Bootstrap ──────────────────────────────────────────────────────────── */
       document.addEventListener("DOMContentLoaded", function () {
         var session = window.__SESSION__;
@@ -2771,6 +3015,11 @@
             i.label +
             "</div>";
         });
+        // Errores de formulario visible para todos (admin ve todos, chofer sus propios)
+        html += '<div class="nav-section">Formulario</div>';
+        html +=
+          '<div class="nav-item" data-route="form-errores" onclick="Router.navigate(\'form-errores\')"><span class="nav-icon">&#9888;</span>Errores Form</div>';
+
         if (isAdmin) {
           html += '<div class="nav-section">Administraci\u00f3n</div>';
           [
@@ -2796,14 +3045,15 @@
       }
 
       function registerRoutes(session) {
-        Router.register("dashboard", makeDashboardPage());
+        Router.register("dashboard", makeDashboardPage(session));
         Router.register("registros", makeRegistrosPage(session));
-        Router.register("reportes", makeReportesPage());
+        Router.register("reportes", makeReportesPage(session));
         Router.register("tarifas", makeTarifasPage());
         Router.register("choferes", makeChoferesPage());
         Router.register("camiones", makeCamionesPage());
         Router.register("usuarios", makeUsuariosPage());
         Router.register("auditoria", makeAuditoriaPage());
+        Router.register("form-errores", makeFormErroresPage(session));
       }
     </script>
   </body>

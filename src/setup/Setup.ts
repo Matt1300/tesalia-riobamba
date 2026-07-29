@@ -24,6 +24,7 @@ namespace Setup {
     crearHoja(ss, Constants.SHEETS.RESUMEN_MENSUAL, Constants.HEADERS.RESUMEN_MENSUAL);
     crearHoja(ss, Constants.SHEETS.CONFIGURACION, Constants.HEADERS.CONFIGURACION);
     crearHoja(ss, Constants.SHEETS.AUDITORIA, Constants.HEADERS.AUDITORIA);
+    crearHoja(ss, Constants.SHEETS.FORM_ERRORES, Constants.HEADERS.FORM_ERRORES);
 
     insertarConfiguracionPorDefecto(ss);
     insertarTarifasIniciales(ss);

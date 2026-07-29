@@ -4,6 +4,9 @@
 namespace CamionService {
   export function getAll(session: Auth.UserSession): Models.Camion[] {
     RoleGuard.requirePermission(session, Auth.Permission.VER_CAMIONES);
+    if (session.rol === Models.Rol.CHOFER && session.choferId) {
+      return CamionesRepository.findByChoferId(session.choferId);
+    }
     return CamionesRepository.findActive();
   }
 

@@ -88,6 +88,8 @@ namespace Auth {
         Permission.VER_PROPIOS_REGISTROS,
         Permission.VER_REPORTE_PROPIO,
         Permission.EXPORTAR,
+        Permission.VER_CHOFERES,  // solo sus propios datos (filtrado en el servicio)
+        Permission.VER_CAMIONES,  // solo sus propios datos (filtrado en el servicio)
       ],
     };
   }

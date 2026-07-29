@@ -15,6 +15,7 @@ namespace Constants {
     RESUMEN_MENSUAL: 'ResumenMensual',
     CONFIGURACION: 'Configuracion',
     AUDITORIA: 'Auditoria',
+    FORM_ERRORES: 'FormErrores',
   } as const;
 
   // ─── Índices de Columnas (0-based) ────────────────────────────────────────
@@ -109,6 +110,18 @@ namespace Constants {
       RESULTADO: 9,
       DETALLE: 10,
     },
+    FORM_ERRORES: {
+      ERROR_ID: 0,
+      TIMESTAMP: 1,
+      EMAIL_CHOFER: 2,
+      CHOFER_ID: 3,
+      RAW_VALUES: 4,
+      MENSAJE_ERROR: 5,
+      ESTADO: 6,
+      RESUELTO_EN: 7,
+      RESUELTO_POR: 8,
+      REGISTRO_ID: 9,
+    },
   } as const;
 
   // ─── Cabeceras de Hojas ───────────────────────────────────────────────────
@@ -147,6 +160,10 @@ namespace Constants {
     AUDITORIA: [
       'AuditoriaId', 'Timestamp', 'UsuarioEmail', 'Accion', 'Entidad',
       'EntidadId', 'ValorAnterior', 'ValorNuevo', 'IpOrigen', 'Resultado', 'Detalle',
+    ],
+    FORM_ERRORES: [
+      'ErrorId', 'Timestamp', 'EmailChofer', 'ChoferId', 'RawValues',
+      'MensajeError', 'Estado', 'ResueltoEn', 'ResueltoPor', 'RegistroId',
     ],
   } as const;
 

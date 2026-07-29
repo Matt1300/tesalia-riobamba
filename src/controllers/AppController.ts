@@ -83,7 +83,8 @@ namespace AppController {
       case 'tarifas':     return TarifaController.handle(method, payload);
       case 'reportes':    return ReporteController.handle(method, payload);
       case 'usuarios':    return UsuarioController.handle(method, payload);
-      case 'auditoria':   return AuditoriaController.handle(method, payload);
+      case 'auditoria':    return AuditoriaController.handle(method, payload);
+      case 'formErrores':  return FormErroresController.handle(method, payload);
       default:
         return API.fail(`Acción desconocida: ${action}`);
     }

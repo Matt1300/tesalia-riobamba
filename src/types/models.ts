@@ -41,6 +41,12 @@ namespace Models {
     ERROR = 'ERROR',
   }
 
+  export enum EstadoFormError {
+    PENDIENTE = 'PENDIENTE',
+    RESUELTO = 'RESUELTO',
+    IGNORADO = 'IGNORADO',
+  }
+
   export interface Usuario {
     usuarioId: string;
     correo: string;
@@ -121,6 +127,19 @@ namespace Models {
     descripcion: string;
     modificadoPor: string;
     fechaModificacion: Date;
+  }
+
+  export interface FormError {
+    errorId: string;
+    timestamp: Date;
+    emailChofer: string;
+    choferId: string | null;
+    rawValues: string;
+    mensajeError: string;
+    estado: EstadoFormError;
+    resueltoEn: Date | null;
+    resueltoPor: string | null;
+    registroId: string | null;
   }
 
   export interface Auditoria {

@@ -4,6 +4,10 @@
 namespace ChoferService {
   export function getAll(session: Auth.UserSession): Models.Chofer[] {
     RoleGuard.requirePermission(session, Auth.Permission.VER_CHOFERES);
+    if (session.rol === Models.Rol.CHOFER && session.choferId) {
+      const propio = ChoferesRepository.findById(session.choferId);
+      return propio ? [propio] : [];
+    }
     return ChoferesRepository.findActive();
   }
 
