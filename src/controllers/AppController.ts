@@ -79,14 +79,14 @@ namespace AppController {
     const [entity, method] = action.split('.');
 
     switch (entity) {
-      case 'registros':   return RegistroController.handle(method, payload);
-      case 'choferes':    return ChoferController.handle(method, payload);
-      case 'camiones':    return CamionController.handle(method, payload);
-      case 'tarifas':     return TarifaController.handle(method, payload);
-      case 'reportes':    return ReporteController.handle(method, payload);
-      case 'usuarios':    return UsuarioController.handle(method, payload);
-      case 'auditoria':    return AuditoriaController.handle(method, payload);
-      case 'formErrores':  return FormErroresController.handle(method, payload);
+      case 'registros': return RegistroController.handle(method, payload);
+      case 'choferes': return ChoferController.handle(method, payload);
+      case 'camiones': return CamionController.handle(method, payload);
+      case 'tarifas': return TarifaController.handle(method, payload);
+      case 'reportes': return ReporteController.handle(method, payload);
+      case 'usuarios': return UsuarioController.handle(method, payload);
+      case 'auditoria': return AuditoriaController.handle(method, payload);
+      case 'formErrores': return FormErroresController.handle(method, payload);
       default:
         return API.fail(`Acción desconocida: ${action}`);
     }
