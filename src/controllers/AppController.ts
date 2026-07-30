@@ -16,12 +16,10 @@ namespace AppController {
       // Inyectar datos de sesión como script antes del </body>
       // Usamos createHtmlOutputFromFile (sin evaluación de plantillas) para evitar
       // conflictos con el motor de templates de GAS y contenido JS complejo.
-      const debugEmail = Session.getActiveUser().getEmail();
       const initScript = `<script>
         window.__SESSION__=${session ? JSON.stringify(session) : 'null'};
         window.__APP_NOMBRE__=${JSON.stringify(appNombre)};
         window.__MONEDA__=${JSON.stringify(moneda)};
-        window.__DEBUG_EMAIL__=${JSON.stringify(debugEmail)};
       </script>`;
 
       return HtmlService.createHtmlOutputFromFile('views/index')

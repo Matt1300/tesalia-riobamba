@@ -11,7 +11,11 @@ namespace FormErroresController {
       switch (method) {
         case 'getAll': {
           if (isAdmin) {
-            return API.ok(FormErroresRepository.findAll());
+            const errores = FormErroresRepository.findAll();
+            return API.ok(errores.map(e => ({
+              ...e,
+              usuarioRegistrado: e.emailChofer ? !!UsuariosRepository.findByEmail(e.emailChofer) : false,
+            })));
           }
           // Chofer solo ve los suyos
           return API.ok(FormErroresRepository.findByEmail(session.email));

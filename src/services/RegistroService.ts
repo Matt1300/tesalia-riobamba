@@ -48,6 +48,13 @@ namespace RegistroService {
   export function crear(dto: DTO.CreateRegistroDTO, session: Auth.UserSession): Models.Registro {
     RoleGuard.requirePermission(session, Auth.Permission.CREAR_REGISTRO);
 
+    // CHOFER solo puede crear registros a su propio nombre
+    if (session.rol === Models.Rol.CHOFER) {
+      if (!session.choferId || dto.choferId !== session.choferId) {
+        throw new Error('Solo puede crear registros a su propio nombre.');
+      }
+    }
+
     // Verificar que chofer y camión existen y están activos
     const chofer = ChoferesRepository.findById(dto.choferId);
     if (!chofer || !chofer.activo) {

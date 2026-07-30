@@ -86,6 +86,8 @@ namespace Auth {
       ],
       [Models.Rol.CHOFER]: [
         Permission.VER_PROPIOS_REGISTROS,
+        Permission.CREAR_REGISTRO,
+        Permission.EDITAR_REGISTRO,
         Permission.VER_REPORTE_PROPIO,
         Permission.EXPORTAR,
         Permission.VER_CHOFERES,  // solo sus propios datos (filtrado en el servicio)

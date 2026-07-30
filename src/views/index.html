@@ -620,6 +620,18 @@
         color: var(--text);
       }
 
+      /* Sidebar backdrop */
+      .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 99;
+      }
+      .sidebar-backdrop.visible {
+        display: block;
+      }
+
       /* Responsive */
       @media (max-width: 768px) {
         .sidebar {
@@ -637,6 +649,23 @@
         .sidebar-toggle {
           display: block;
         }
+        .content {
+          padding: 12px;
+        }
+        .card {
+          padding: 14px;
+        }
+        .cards-grid {
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          margin-bottom: 14px;
+        }
+        .stat-card {
+          padding: 14px;
+        }
+        .stat-value {
+          font-size: 22px;
+        }
         .form-row {
           grid-template-columns: 1fr;
         }
@@ -646,6 +675,65 @@
         }
         .filter-bar .form-control {
           min-width: unset;
+          width: 100%;
+        }
+        .toolbar {
+          flex-direction: column;
+          align-items: stretch;
+        }
+        .toolbar > .btn,
+        .toolbar > button {
+          width: 100%;
+          justify-content: center;
+        }
+        .topbar-user {
+          display: none;
+        }
+        .btn {
+          min-height: 42px;
+        }
+        .btn-icon {
+          min-height: 36px;
+          padding: 6px 10px;
+          font-size: 12px;
+        }
+        .form-control {
+          min-height: 42px;
+          font-size: 16px; /* evita zoom en iOS */
+        }
+        .modal-overlay {
+          padding: 0;
+          align-items: flex-end;
+        }
+        .modal-dialog {
+          max-width: 100%;
+          max-height: 92vh;
+          border-radius: 16px 16px 0 0;
+        }
+        .modal-footer {
+          padding-bottom: 24px; /* espacio para safe area en iOS */
+        }
+        .modal-footer .btn {
+          flex: 1;
+        }
+        .toast-container {
+          bottom: 80px;
+          left: 12px;
+          right: 12px;
+        }
+        .toast {
+          max-width: 100%;
+        }
+        td, th {
+          padding: 8px 10px;
+          font-size: 12px;
+        }
+        .nav-item {
+          padding: 14px 16px;
+          font-size: 15px;
+        }
+        .nav-item .nav-icon {
+          font-size: 20px;
         }
       }
     </style>
@@ -660,6 +748,7 @@
 
     <template id="tpl-layout">
       <div class="layout">
+        <div class="sidebar-backdrop" id="sidebar-backdrop"></div>
         <aside class="sidebar" id="sidebar">
           <div class="sidebar-header">
             <span class="sidebar-logo">&#x1F69B;</span>
@@ -693,8 +782,6 @@
         <h2>Sin acceso</h2>
         <p>Su cuenta no tiene acceso al sistema.</p>
         <p>Contacte al administrador para solicitar acceso.</p>
-        <p style="margin-top:16px;font-size:12px;color:#999">Email detectado: <strong id="debug-email">cargando...</strong></p>
-        <script>document.getElementById('debug-email').textContent = window.__DEBUG_EMAIL__ || '(vacío)';</script>
       </div>
     </template>
 
@@ -1513,9 +1600,7 @@
             '<button class="btn btn-secondary" id="btn-filtrar">Filtrar</button>' +
             '<button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>' +
             "</div>" +
-            (isAdmin
-              ? '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>'
-              : "") +
+            '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>' +
             "</div></div>" +
             '<div class="card"><div class="card-title">Registros (' +
             _data.length +
@@ -1565,42 +1650,36 @@
           });
         }
 
-        function _form(r) {
-          var chSel = UI.choferOptions(_choferes, r ? r.choferId : "");
+        function _form(r, fixedChoferId) {
+          var chSel = isAdmin ? UI.choferOptions(_choferes, r ? r.choferId : (fixedChoferId || "")) : "";
           var caSel = UI.camionOptions(_camiones, r ? r.camionId : "");
           var tipoU = !r || r.tipoRuta === "URBANA";
           var fecha = r ? (r.fecha || "").split("T")[0] : isoToday();
+          var choferField = isAdmin
+            ? '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="m-chofer"' +
+              (r ? " disabled" : "") + ">" + chSel + "</select></div>"
+            : '<input type="hidden" id="m-chofer" value="' + (fixedChoferId || "") + '">';
           return (
             '<div class="form-row">' +
             '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="m-fecha" value="' +
-            fecha +
-            '"></div>' +
+            fecha + '"></div>' +
             '<div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="m-tipo"><option value="URBANA"' +
-            (tipoU ? " selected" : "") +
-            '>Urbana</option><option value="RURAL"' +
-            (!tipoU ? " selected" : "") +
-            ">Rural</option></select></div>" +
+            (tipoU ? " selected" : "") + '>Urbana</option><option value="RURAL"' +
+            (!tipoU ? " selected" : "") + ">Rural</option></select></div>" +
             '</div><div class="form-row">' +
-            '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="m-chofer"' +
-            (r ? " disabled" : "") +
-            ">" +
-            chSel +
-            "</select></div>" +
+            choferField +
             '<div class="form-group"><label class="form-label">Cami&#243;n *</label><select class="form-control" id="m-camion"' +
-            (r ? " disabled" : "") +
-            ">" +
-            caSel +
-            "</select></div>" +
+            (r ? " disabled" : "") + ">" + caSel + "</select></div>" +
             '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="m-obs" rows="2">' +
-            (r ? r.observaciones || "" : "") +
-            "</textarea></div>"
+            (r ? r.observaciones || "" : "") + "</textarea></div>"
           );
         }
 
         function _openCreate(container) {
+          var fixedChoferId = isAdmin ? null : session.choferId;
           Modal.show({
             title: "Nuevo Registro",
-            body: _form(null),
+            body: _form(null, fixedChoferId),
             onSave: function () {
               var fecha = Modal.val("m-fecha"),
                 choferId = Modal.val("m-chofer"),
@@ -1631,32 +1710,27 @@
             },
           });
 
-          // Filtrar camiones al cambiar el chofer seleccionado
-          var choferSel = Modal._el.querySelector("#m-chofer");
           var camionSel = Modal._el.querySelector("#m-camion");
-          function _updateCamiones() {
-            var cId = choferSel.value;
+          function _updateCamiones(cId) {
             var filtrados = _camiones.filter(function (c) {
               return c.activo && c.choferId === cId;
             });
             camionSel.innerHTML =
               filtrados.length > 0
-                ? filtrados
-                    .map(function (c) {
-                      return (
-                        '<option value="' +
-                        c.camionId +
-                        '">' +
-                        c.patente +
-                        (c.modelo ? " &mdash; " + c.modelo : "") +
-                        "</option>"
-                      );
-                    })
-                    .join("")
+                ? filtrados.map(function (c) {
+                    return '<option value="' + c.camionId + '">' + c.patente +
+                      (c.modelo ? " &mdash; " + c.modelo : "") + "</option>";
+                  }).join("")
                 : '<option value="">Sin cami&#243;n asignado</option>';
           }
-          choferSel.addEventListener("change", _updateCamiones);
-          _updateCamiones(); // aplicar al cargar con el chofer inicial
+
+          if (isAdmin) {
+            var choferSel = Modal._el.querySelector("#m-chofer");
+            choferSel.addEventListener("change", function () { _updateCamiones(choferSel.value); });
+            _updateCamiones(choferSel.value);
+          } else {
+            _updateCamiones(fixedChoferId);
+          }
         }
 
         function _openEdit(container, r) {
@@ -2881,40 +2955,29 @@
                   e.errorId +
                   '" title="Ignorar este error">Ignorar</button>';
               }
-              var rawObj = {};
-              try {
-                rawObj = JSON.parse(e.rawValues || "[]");
-              } catch (_) {}
+              var rawObj = [];
+              try { rawObj = JSON.parse(e.rawValues || "[]"); } catch (_) {}
               var rawResumen = Array.isArray(rawObj)
                 ? rawObj.slice(0, 6).join(" | ")
                 : e.rawValues;
               return (
                 "<tr>" +
-                "<td>" +
-                UI.formatDateTime(e.timestamp) +
-                "</td>" +
+                "<td>" + UI.formatDateTime(e.timestamp) + "</td>" +
                 "<td>" +
                 (e.emailChofer || "-") +
+                (isAdmin && e.usuarioRegistrado === false
+                  ? '<br><span class="badge" style="background:#fce8e6;color:#b71c1c;font-size:10px">Sin usuario</span>'
+                  : "") +
                 "</td>" +
-                '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' +
+                '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                '<span class="fe-ver-detalle" data-id="' + e.errorId + '" style="cursor:pointer;color:var(--primary);text-decoration:underline dotted" title="Clic para ver detalle completo">' +
                 e.mensajeError +
-                '">' +
-                e.mensajeError +
-                "</td>" +
-                '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:12px" title="' +
-                rawResumen +
-                '">' +
-                rawResumen +
-                "</td>" +
-                "<td>" +
-                _estadoBadge(e.estado) +
-                "</td>" +
-                (e.resueltoPor
-                  ? "<td>" + e.resueltoPor + "</td>"
-                  : "<td>-</td>") +
-                '<td><div class="action-btns">' +
-                btns +
-                "</div></td>" +
+                "</span></td>" +
+                '<td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted);font-size:12px">' +
+                rawResumen + "</td>" +
+                "<td>" + _estadoBadge(e.estado) + "</td>" +
+                "<td>" + (e.resueltoPor || "-") + "</td>" +
+                '<td><div class="action-btns">' + btns + "</div></td>" +
                 "</tr>"
               );
             })
@@ -2949,6 +3012,58 @@
               if (btn.dataset.action === "ignorar")
                 _ignorar(container, errorId);
               if (btn.dataset.action === "crear") _openCrear(container, err);
+            };
+          });
+
+          container.querySelectorAll(".fe-ver-detalle").forEach(function (span) {
+            span.onclick = function () {
+              var errorId = span.dataset.id;
+              var err = _data.filter(function (x) { return x.errorId === errorId; })[0];
+              if (!err) return;
+              var rawObj = [];
+              try { rawObj = JSON.parse(err.rawValues || "[]"); } catch (_) {}
+              var rawHtml = "";
+              if (Array.isArray(rawObj) && rawObj.length > 0) {
+                var labels = ["Timestamp", "Email", "Fecha", "Patente", "Tipo Ruta", "Observaciones"];
+                rawObj.forEach(function (v, i) {
+                  rawHtml +=
+                    '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0">' +
+                    '<span style="min-width:100px;font-weight:600;color:var(--text-muted);font-size:12px">' +
+                    (labels[i] || ("Campo " + (i + 1))) + "</span>" +
+                    '<span style="word-break:break-all">' + (v || "-") + "</span></div>";
+                });
+              } else {
+                rawHtml = '<pre style="white-space:pre-wrap;word-break:break-all;font-size:12px;background:#f8f9fa;padding:8px;border-radius:4px">' + (err.rawValues || "-") + "</pre>";
+              }
+              var resolvedSection = "";
+              if (err.resueltoPor) {
+                resolvedSection =
+                  '<div style="margin-top:12px;padding:10px;background:#e6f4ea;border-radius:6px">' +
+                  '<div style="font-size:12px;color:#2e7d32"><strong>Resuelto por:</strong> ' + err.resueltoPor + "</div>" +
+                  (err.resueltoEn ? '<div style="font-size:12px;color:#2e7d32"><strong>Fecha resolución:</strong> ' + UI.formatDateTime(err.resueltoEn) + "</div>" : "") +
+                  (err.registroId ? '<div style="font-size:12px;color:#2e7d32"><strong>Registro creado:</strong> ' + err.registroId + "</div>" : "") +
+                  "</div>";
+              }
+              Modal.show({
+                title: "Detalle del error",
+                body:
+                  '<div style="margin-bottom:12px">' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">FECHA</div>' +
+                  '<div>' + UI.formatDateTime(err.timestamp) + "</div></div>" +
+                  '<div style="margin-bottom:12px">' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">EMAIL</div>' +
+                  '<div>' + (err.emailChofer || "-") + "</div></div>" +
+                  '<div style="margin-bottom:12px">' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">ESTADO</div>' +
+                  '<div>' + _estadoBadge(err.estado) + "</div></div>" +
+                  '<div style="margin-bottom:12px">' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">MENSAJE DE ERROR</div>' +
+                  '<div style="background:#fce8e6;border-radius:6px;padding:10px;word-break:break-word;font-size:13px;color:#b71c1c">' + err.mensajeError + "</div></div>" +
+                  '<div style="margin-bottom:12px">' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">DATOS ENVIADOS POR EL FORMULARIO</div>' +
+                  rawHtml + "</div>" +
+                  resolvedSection,
+              });
             };
           });
         }
@@ -3147,14 +3262,37 @@
         document
           .getElementById("btn-logout")
           .addEventListener("click", function () {
-            if (confirm("&#191;Desea cerrar la aplicaci&#243;n?"))
-              window.close();
+            Modal.show({
+              title: "Cerrar sesi\u00f3n",
+              danger: true,
+              saveLabel: "Cerrar sesi\u00f3n",
+              body:
+                "<p>Para cerrar sesi\u00f3n debes salir de tu cuenta Google.</p>" +
+                '<p style="margin-top:8px;color:var(--text-muted);font-size:13px">Ser\u00e1s redirigido a la p\u00e1gina de cierre de sesi\u00f3n de Google. Tendr\u00e1s que volver a iniciar sesi\u00f3n la pr\u00f3xima vez.</p>',
+              onSave: function () {
+                window.location.href = "https://accounts.google.com/Logout";
+              },
+            });
           });
+
+        function _closeSidebar() {
+          document.getElementById("sidebar").classList.remove("open");
+          document.getElementById("sidebar-backdrop").classList.remove("visible");
+        }
         document
           .getElementById("sidebar-toggle")
           .addEventListener("click", function () {
-            document.getElementById("sidebar").classList.toggle("open");
+            var sidebar = document.getElementById("sidebar");
+            var backdrop = document.getElementById("sidebar-backdrop");
+            sidebar.classList.toggle("open");
+            backdrop.classList.toggle("visible", sidebar.classList.contains("open"));
           });
+        document
+          .getElementById("sidebar-backdrop")
+          .addEventListener("click", _closeSidebar);
+        document.getElementById("sidebar-nav").addEventListener("click", function () {
+          _closeSidebar();
+        });
 
         buildMenu(session);
         registerRoutes(session);
