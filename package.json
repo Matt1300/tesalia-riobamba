@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build":   "tsc && cp src/appsscript.json dist/ && cp -r src/views dist/",
-    "push":    "npm run build && clasp push",
+    "push":    "npm run build && clasp push --force",
     "pull":    "clasp pull",
     "version": "clasp version create",
     "release": "npm run push && clasp deploy --deploymentId AKfycbzoBVE0VBy-p3ftt-CIS-G4LR3lTFwVavu1YjPe7r6bNv2r91KcoEBGYya3vW5hGSjDWA",
