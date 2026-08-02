@@ -438,13 +438,26 @@
       }
       .filter-bar {
         display: flex;
-        gap: 8px;
+        gap: 12px;
         flex-wrap: wrap;
-        align-items: center;
+        align-items: flex-end;
       }
       .filter-bar .form-control {
         width: auto;
         min-width: 140px;
+      }
+      .filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .filter-field .form-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 0;
       }
 
       /* Acciones en tabla */
@@ -782,6 +795,9 @@
         }
         .filter-bar .form-control {
           min-width: unset;
+          width: 100%;
+        }
+        .filter-field {
           width: 100%;
         }
         .toolbar {
@@ -1684,8 +1700,8 @@
             '<div class="card" style="margin-bottom:16px">' +
             '<button class="filter-toggle" id="reg-filter-toggle">&#9660; Filtros</button>' +
             '<div class="filter-collapsible collapsed" id="reg-filter-body"><div class="filter-bar">' +
-            '<input type="date" class="form-control" id="f-desde" value="' + (_filtro.fechaDesde || "") + '" placeholder="Desde">' +
-            '<input type="date" class="form-control" id="f-hasta" value="' + (_filtro.fechaHasta || "") + '" placeholder="Hasta">' +
+            '<div class="filter-field"><label class="form-label">Desde</label><input type="date" class="form-control" id="f-desde" value="' + (_filtro.fechaDesde || "") + '"></div>' +
+            '<div class="filter-field"><label class="form-label">Hasta</label><input type="date" class="form-control" id="f-hasta" value="' + (_filtro.fechaHasta || "") + '"></div>' +
             choferSelectHtml +
             '<select class="form-control" id="f-estado">' +
             '<option value="">Todos los estados</option>' +
