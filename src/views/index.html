@@ -1733,10 +1733,16 @@
           }
 
           container.querySelector("#btn-filtrar").onclick = function () {
+            var desde = container.querySelector("#f-desde").value;
+            var hasta = container.querySelector("#f-hasta").value;
+            if (desde && hasta && desde > hasta) {
+              Toast.error("La fecha inicio no puede ser mayor a la fecha fin.");
+              return;
+            }
             var choferEl = container.querySelector("#f-chofer");
             _load(container, {
-              fechaDesde: container.querySelector("#f-desde").value || undefined,
-              fechaHasta: container.querySelector("#f-hasta").value || undefined,
+              fechaDesde: desde || undefined,
+              fechaHasta: hasta || undefined,
               choferId: choferEl ? choferEl.value || undefined : undefined,
               estado: container.querySelector("#f-estado").value || undefined,
             });
