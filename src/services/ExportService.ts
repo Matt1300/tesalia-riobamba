@@ -159,15 +159,15 @@ namespace ExportService {
 
     // Resumen
     const summary = [
-      ['Total Registros', detalle.totalRegistros, 'Urbanas', detalle.totalUrbanas,
-        'Rurales', detalle.totalRurales, 'Monto Total', detalle.montoTotal],
+      ['Total Registros', detalle.totalRegistros, 'Entregas', detalle.totalEntregas,
+        'Recargues', detalle.totalRecargues, 'Monto Total', detalle.montoTotal],
     ];
     const summaryRange = sheet.getRange(4, 1, 1, 8);
     summaryRange.setValues(summary).setFontWeight('bold').setBackground('#E8F5E9');
     sheet.getRange(4, 8, 1, 1).setNumberFormat('"$"#,##0.00');
 
     // Cabeceras de detalle
-    const headers = ['Fecha', 'Camión', 'Modelo', 'Tipo Ruta', 'Tarifa', 'Estado', 'Observaciones'];
+    const headers = ['Fecha', 'Placa', 'Operación', 'Zona', 'Cantidad', 'Km', 'Rechazos', 'Tarifa', 'Estado', 'Observaciones'];
     sheet.getRange(6, 1, 1, headers.length)
       .setValues([headers])
       .setFontWeight('bold')
@@ -178,15 +178,18 @@ namespace ExportService {
     if (detalle.registros.length > 0) {
       const rows = detalle.registros.map(r => [
         r.fecha,
-        r.camionPatente,
-        r.camionModelo,
-        r.tipoRuta,
+        r.placa,
+        r.tipoOperacion,
+        r.tipoZona,
+        r.cantidadRecargues,
+        r.kilometraje,
+        r.tieneRechazos ? 'Sí' : 'No',
         r.tarifaAplicada,
         r.estado,
         r.observaciones,
       ]);
       sheet.getRange(7, 1, rows.length, headers.length).setValues(rows);
-      sheet.getRange(7, 5, rows.length, 1).setNumberFormat('"$"#,##0.00');
+      sheet.getRange(7, 8, rows.length, 1).setNumberFormat('"$"#,##0.00');
     }
 
     sheet.autoResizeColumns(1, headers.length);
@@ -212,7 +215,7 @@ namespace ExportService {
 
     // Totales globales
     const globalSummary = [
-      ['Total Registros', resumen.totalRegistros, 'Urbanas', resumen.totalUrbanas, 'Rurales', resumen.totalRurales],
+      ['Total Registros', resumen.totalRegistros, 'Entregas', resumen.totalEntregas, 'Recargues', resumen.totalRecargues],
     ];
     sheet.getRange(4, 1, 1, 6).setValues(globalSummary).setFontWeight('bold').setBackground('#E3F2FD');
     sheet.getRange('A5').setValue('Monto Total');
@@ -220,7 +223,7 @@ namespace ExportService {
     sheet.getRange('A5:B5').setFontWeight('bold').setBackground('#E3F2FD');
 
     // Por chofer
-    const headers = ['Chofer', 'Total Registros', 'Urbanas', 'Rurales', 'Monto Total'];
+    const headers = ['Chofer', 'Total Registros', 'Entregas', 'Recargues', 'Monto Total'];
     sheet.getRange(7, 1, 1, headers.length)
       .setValues([headers])
       .setFontWeight('bold')
@@ -231,8 +234,8 @@ namespace ExportService {
       const rows = resumen.porChofer.map(c => [
         c.chofer.nombre,
         c.totalRegistros,
-        c.totalUrbanas,
-        c.totalRurales,
+        c.totalEntregas,
+        c.totalRecargues,
         c.montoTotal,
       ]);
       sheet.getRange(8, 1, rows.length, headers.length).setValues(rows);

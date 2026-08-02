@@ -10,7 +10,14 @@ namespace DTO {
     fecha: string; // ISO: YYYY-MM-DD
     choferId: string;
     camionId: string;
-    tipoRuta: Models.TipoRuta;
+    placa: string;
+    transporte: string;
+    ruta: string;
+    tipoOperacion: Models.TipoOperacion;
+    tipoZona: Models.TipoZona;
+    cantidadRecargues: number; // 1-5; siempre 1 para ENTREGA
+    kilometraje: number;
+    tieneRechazos: boolean;
     observaciones?: string;
     origen?: Models.OrigenRegistro;
     formResponseId?: string;
@@ -18,7 +25,13 @@ namespace DTO {
 
   export interface UpdateRegistroDTO {
     fecha?: string;
-    tipoRuta?: Models.TipoRuta;
+    transporte?: string;
+    ruta?: string;
+    tipoOperacion?: Models.TipoOperacion;
+    tipoZona?: Models.TipoZona;
+    cantidadRecargues?: number;
+    kilometraje?: number;
+    tieneRechazos?: boolean;
     observaciones?: string;
   }
 
@@ -65,7 +78,8 @@ namespace DTO {
   // ─── Tarifas ──────────────────────────────────────────────────────────────
 
   export interface CreateTarifaDTO {
-    tipoRuta: Models.TipoRuta;
+    tipoOperacion: Models.TipoOperacion;
+    tipoZona: Models.TipoZona;
     valor: number;
     descripcion: string;
     fechaVigencia?: string; // ISO: YYYY-MM-DD
@@ -90,7 +104,8 @@ namespace DTO {
   export interface FiltroReporteDTO {
     choferId?: string;
     camionId?: string;
-    tipoRuta?: Models.TipoRuta;
+    tipoOperacion?: Models.TipoOperacion;
+    tipoZona?: Models.TipoZona;
     fechaDesde?: string; // ISO: YYYY-MM-DD
     fechaHasta?: string; // ISO: YYYY-MM-DD
     anio?: number;
@@ -101,8 +116,8 @@ namespace DTO {
   export interface ResumenChoferDTO {
     chofer: Models.Chofer;
     totalRegistros: number;
-    totalUrbanas: number;
-    totalRurales: number;
+    totalEntregas: number;
+    totalRecargues: number;
     montoTotal: number;
     periodo: string;
   }
@@ -111,9 +126,14 @@ namespace DTO {
 
   export interface FormResponseDTO {
     fecha: string;
-    emailChofer: string;
-    patenteCamion: string;
-    tipoRuta: string;
+    placa: string;
+    transporte: string;
+    ruta: string;
+    tipoOperacion: string;
+    tipoZona: string;
+    cantidadRecargues: number;
+    kilometraje: number;
+    tieneRechazos: boolean;
     observaciones?: string;
     responseId?: string;
   }

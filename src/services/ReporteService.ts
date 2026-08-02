@@ -6,24 +6,25 @@ namespace ReporteService {
   export interface TotalPorChofer {
     chofer: Models.Chofer;
     totalRegistros: number;
-    totalUrbanas: number;
-    totalRurales: number;
+    totalEntregas: number;
+    totalRecargues: number;
     montoTotal: number;
   }
 
-  export interface TotalPorTipoRuta {
-    tipoRuta: Models.TipoRuta;
+  export interface TotalPorOperacion {
+    tipoOperacion: Models.TipoOperacion;
+    tipoZona: Models.TipoZona;
     totalRegistros: number;
     montoTotal: number;
   }
 
   export interface ResumenPeriodo {
     totalRegistros: number;
-    totalUrbanas: number;
-    totalRurales: number;
+    totalEntregas: number;
+    totalRecargues: number;
     montoTotal: number;
     porChofer: TotalPorChofer[];
-    porTipoRuta: TotalPorTipoRuta[];
+    porOperacion: TotalPorOperacion[];
   }
 
   /** Reporte global por período (admin). */
@@ -45,8 +46,8 @@ namespace ReporteService {
         porChoferMap.set(r.choferId, {
           chofer,
           totalRegistros: 0,
-          totalUrbanas: 0,
-          totalRurales: 0,
+          totalEntregas: 0,
+          totalRecargues: 0,
           montoTotal: 0,
         });
       }
@@ -54,25 +55,35 @@ namespace ReporteService {
       const entry = porChoferMap.get(r.choferId)!;
       entry.totalRegistros++;
       entry.montoTotal = NumberUtils.round2(entry.montoTotal + r.tarifaAplicada);
-      if (r.tipoRuta === Models.TipoRuta.URBANA) entry.totalUrbanas++;
-      if (r.tipoRuta === Models.TipoRuta.RURAL) entry.totalRurales++;
+      if (r.tipoOperacion === Models.TipoOperacion.ENTREGA) entry.totalEntregas++;
+      if (r.tipoOperacion === Models.TipoOperacion.RECARGUE) entry.totalRecargues++;
     }
 
-    const porTipoRuta: TotalPorTipoRuta[] = Object.values(Models.TipoRuta).map(tipo => ({
-      tipoRuta: tipo,
-      totalRegistros: registros.filter(r => r.tipoRuta === tipo).length,
+    const combos: Array<[Models.TipoOperacion, Models.TipoZona]> = [
+      [Models.TipoOperacion.ENTREGA, Models.TipoZona.URBANO],
+      [Models.TipoOperacion.ENTREGA, Models.TipoZona.FORANEO],
+      [Models.TipoOperacion.ENTREGA, Models.TipoZona.EXTRAFORANEO],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.URBANO],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.FORANEO],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.EXTRAFORANEO],
+    ];
+    const porOperacion: TotalPorOperacion[] = combos.map(([op, zona]) => ({
+      tipoOperacion: op,
+      tipoZona: zona,
+      totalRegistros: registros.filter(r => r.tipoOperacion === op && r.tipoZona === zona).length,
       montoTotal: NumberUtils.round2(
-        registros.filter(r => r.tipoRuta === tipo).reduce((s, r) => s + r.tarifaAplicada, 0)
+        registros.filter(r => r.tipoOperacion === op && r.tipoZona === zona)
+          .reduce((s, r) => s + r.tarifaAplicada, 0)
       ),
     }));
 
     return {
       totalRegistros: registros.length,
-      totalUrbanas: registros.filter(r => r.tipoRuta === Models.TipoRuta.URBANA).length,
-      totalRurales: registros.filter(r => r.tipoRuta === Models.TipoRuta.RURAL).length,
+      totalEntregas: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.ENTREGA).length,
+      totalRecargues: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.RECARGUE).length,
       montoTotal: NumberUtils.round2(registros.reduce((s, r) => s + r.tarifaAplicada, 0)),
       porChofer: Array.from(porChoferMap.values()),
-      porTipoRuta,
+      porOperacion,
     };
   }
 
@@ -99,8 +110,8 @@ namespace ReporteService {
     return {
       chofer,
       totalRegistros: registros.length,
-      totalUrbanas: registros.filter(r => r.tipoRuta === Models.TipoRuta.URBANA).length,
-      totalRurales: registros.filter(r => r.tipoRuta === Models.TipoRuta.RURAL).length,
+      totalEntregas: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.ENTREGA).length,
+      totalRecargues: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.RECARGUE).length,
       montoTotal: NumberUtils.round2(registros.reduce((s, r) => s + r.tarifaAplicada, 0)),
       periodo,
     };
@@ -109,9 +120,13 @@ namespace ReporteService {
   export interface DetalleRegistro {
     registroId: string;
     fecha: string;
+    placa: string;
     camionPatente: string;
-    camionModelo: string;
-    tipoRuta: Models.TipoRuta;
+    tipoOperacion: Models.TipoOperacion;
+    tipoZona: Models.TipoZona;
+    cantidadRecargues: number;
+    kilometraje: number;
+    tieneRechazos: boolean;
     tarifaAplicada: number;
     estado: Models.EstadoRegistro;
     observaciones: string;
@@ -121,8 +136,8 @@ namespace ReporteService {
     chofer: Models.Chofer;
     periodo: string;
     totalRegistros: number;
-    totalUrbanas: number;
-    totalRurales: number;
+    totalEntregas: number;
+    totalRecargues: number;
     montoTotal: number;
     registros: DetalleRegistro[];
   }
@@ -141,35 +156,33 @@ namespace ReporteService {
     const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId })
       .filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
 
-    const camionesMap = new Map<string, Models.Camion>();
-    CamionesRepository.findAll().forEach(c => camionesMap.set(c.camionId, c));
-
     const periodo = filtro.anio && filtro.mes
       ? `${DateUtils.monthName(filtro.mes)} ${filtro.anio}`
       : filtro.fechaDesde && filtro.fechaHasta
         ? `${filtro.fechaDesde} - ${filtro.fechaHasta}`
         : 'Todo el período';
 
-    const detalleRegistros: DetalleRegistro[] = registros.map(r => {
-      const camion = camionesMap.get(r.camionId);
-      return {
-        registroId: r.registroId,
-        fecha: DateUtils.toISODate(r.fecha),
-        camionPatente: camion ? camion.patente : r.camionId,
-        camionModelo: camion ? camion.modelo : '',
-        tipoRuta: r.tipoRuta,
-        tarifaAplicada: r.tarifaAplicada,
-        estado: r.estado,
-        observaciones: r.observaciones,
-      };
-    });
+    const detalleRegistros: DetalleRegistro[] = registros.map(r => ({
+      registroId: r.registroId,
+      fecha: DateUtils.toISODate(r.fecha),
+      placa: r.placa,
+      camionPatente: r.placa, // alias para compatibilidad con el frontend
+      tipoOperacion: r.tipoOperacion,
+      tipoZona: r.tipoZona,
+      cantidadRecargues: r.cantidadRecargues,
+      kilometraje: r.kilometraje,
+      tieneRechazos: r.tieneRechazos,
+      tarifaAplicada: r.tarifaAplicada,
+      estado: r.estado,
+      observaciones: r.observaciones,
+    }));
 
     return {
       chofer,
       periodo,
       totalRegistros: registros.length,
-      totalUrbanas: registros.filter(r => r.tipoRuta === Models.TipoRuta.URBANA).length,
-      totalRurales: registros.filter(r => r.tipoRuta === Models.TipoRuta.RURAL).length,
+      totalEntregas: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.ENTREGA).length,
+      totalRecargues: registros.filter(r => r.tipoOperacion === Models.TipoOperacion.RECARGUE).length,
       montoTotal: NumberUtils.round2(registros.reduce((s, r) => s + r.tarifaAplicada, 0)),
       registros: detalleRegistros,
     };

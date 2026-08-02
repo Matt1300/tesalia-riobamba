@@ -632,6 +632,114 @@
         display: block;
       }
 
+      /* Stat card mejorado */
+      .stat-card {
+        position: relative;
+        overflow: hidden;
+      }
+      .stat-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 4px;
+        background: var(--primary);
+        border-radius: 2px 0 0 2px;
+      }
+      .stat-card.accent-green::before { background: var(--secondary); }
+      .stat-card.accent-blue::before { background: #1565c0; }
+      .stat-card.accent-orange::before { background: #f57c00; }
+      .stat-card.accent-red::before { background: var(--danger); }
+      .stat-card.accent-purple::before { background: #7b1fa2; }
+      .stat-icon {
+        font-size: 22px;
+        margin-bottom: 8px;
+        display: block;
+      }
+      .stat-card { padding-left: 20px; }
+
+      /* Grid responsive para stats en reportes */
+      .stats-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+
+      /* Filtros colapsables en mobile */
+      .filter-toggle {
+        display: none;
+        width: 100%;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 10px 14px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text);
+        cursor: pointer;
+        text-align: left;
+        margin-bottom: 8px;
+      }
+      .filter-collapsible { display: contents; }
+
+      /* FAB (Floating Action Button) para mobile */
+      .fab {
+        display: none;
+        position: fixed;
+        bottom: 24px;
+        right: 20px;
+        z-index: 50;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: var(--primary);
+        color: #fff;
+        font-size: 28px;
+        border: none;
+        cursor: pointer;
+        box-shadow: 0 4px 16px rgba(26,115,232,0.4);
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+      }
+
+      /* Tabla responsiva — modo tarjeta en mobile */
+      @media (max-width: 768px) {
+        table.resp-table thead { display: none; }
+        table.resp-table tbody tr {
+          display: block;
+          background: var(--surface);
+          border: 1px solid var(--border);
+          border-radius: var(--radius);
+          margin-bottom: 10px;
+          box-shadow: var(--shadow);
+        }
+        table.resp-table tbody td {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 9px 14px;
+          border-bottom: 1px solid var(--border);
+          font-size: 13px;
+        }
+        table.resp-table tbody td:last-child { border-bottom: none; }
+        table.resp-table tbody td::before {
+          content: attr(data-label);
+          font-weight: 600;
+          color: var(--text-muted);
+          font-size: 11px;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+          margin-right: 12px;
+          flex-shrink: 0;
+        }
+        table.resp-table tfoot { display: none; }
+        .table-wrapper { overflow-x: unset; }
+        .stats-grid-4 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .fab { display: flex; }
+        .fab-spacer { height: 80px; }
+      }
+
       /* Responsive */
       @media (max-width: 768px) {
         .sidebar {
@@ -661,7 +769,7 @@
           margin-bottom: 14px;
         }
         .stat-card {
-          padding: 14px;
+          padding: 14px 14px 14px 20px;
         }
         .stat-value {
           font-size: 22px;
@@ -669,9 +777,12 @@
         .form-row {
           grid-template-columns: 1fr;
         }
+        .filter-toggle { display: block; }
+        .filter-collapsible.collapsed { display: none; }
         .filter-bar {
           flex-direction: column;
           align-items: stretch;
+          gap: 8px;
         }
         .filter-bar .form-control {
           min-width: unset;
@@ -690,15 +801,15 @@
           display: none;
         }
         .btn {
-          min-height: 42px;
+          min-height: 44px;
         }
         .btn-icon {
-          min-height: 36px;
-          padding: 6px 10px;
-          font-size: 12px;
+          min-height: 38px;
+          padding: 6px 12px;
+          font-size: 13px;
         }
         .form-control {
-          min-height: 42px;
+          min-height: 44px;
           font-size: 16px; /* evita zoom en iOS */
         }
         .modal-overlay {
@@ -707,26 +818,22 @@
         }
         .modal-dialog {
           max-width: 100%;
-          max-height: 92vh;
-          border-radius: 16px 16px 0 0;
+          max-height: 94vh;
+          border-radius: 20px 20px 0 0;
         }
         .modal-footer {
-          padding-bottom: 24px; /* espacio para safe area en iOS */
+          padding-bottom: max(24px, env(safe-area-inset-bottom));
         }
         .modal-footer .btn {
           flex: 1;
         }
         .toast-container {
-          bottom: 80px;
+          bottom: 88px;
           left: 12px;
           right: 12px;
         }
         .toast {
           max-width: 100%;
-        }
-        td, th {
-          padding: 8px 10px;
-          font-size: 12px;
         }
         .nav-item {
           padding: 14px 16px;
@@ -1157,15 +1264,28 @@
             ? '<span class="badge badge-activo">Activo</span>'
             : '<span class="badge badge-inactivo">Inactivo</span>';
         },
+        operacionBadge: function (op, zona, cantidad) {
+          if (!op) return "-";
+          var colorOp = op === "ENTREGA"
+            ? "background:#e8f5e9;color:#2e7d32"
+            : "background:#e3f2fd;color:#1565c0";
+          var colorZona = zona === "URBANO"
+            ? "background:#f3e5f5;color:#6a1b9a"
+            : zona === "FORANEO"
+            ? "background:#fff3e0;color:#e65100"
+            : "background:#fce8e6;color:#b71c1c";
+          var cantidadTag = op === "RECARGUE" && cantidad > 1
+            ? ' <span style="font-size:10px;background:#1565c0;color:#fff;border-radius:10px;padding:1px 5px">&times;' + cantidad + "</span>"
+            : "";
+          return (
+            '<span class="badge" style="' + colorOp + '">' + op + "</span> " +
+            '<span class="badge" style="' + colorZona + '">' + (zona || "") + "</span>" +
+            cantidadTag
+          );
+        },
         rutaBadge: function (tipo) {
           if (!tipo) return "-";
-          return (
-            '<span class="badge badge-' +
-            tipo.toLowerCase() +
-            '">' +
-            tipo +
-            "</span>"
-          );
+          return '<span class="badge">' + tipo + "</span>";
         },
         choferName: function (choferes, id) {
           var c = choferes.filter(function (x) {
@@ -1302,11 +1422,11 @@
               var totalMonto = registros.reduce(function (s, x) {
                 return s + (x.tarifaAplicada || 0);
               }, 0);
-              var totalUrbanas = registros.filter(function (x) {
-                return x.tipoRuta === "URBANA";
+              var totalEntregas = registros.filter(function (x) {
+                return x.tipoOperacion === "ENTREGA";
               }).length;
-              var totalRurales = registros.filter(function (x) {
-                return x.tipoRuta === "RURAL";
+              var totalRecargues = registros.filter(function (x) {
+                return x.tipoOperacion === "RECARGUE";
               }).length;
               var pendientes = registros.filter(function (x) {
                 return x.estado === "PENDIENTE";
@@ -1322,38 +1442,25 @@
                 : monthName;
 
               var statsCards =
-                '<div class="stat-card"><div class="stat-label">Registros</div><div class="stat-value">' +
+                '<div class="stat-card"><span class="stat-icon">&#128203;</span><div class="stat-label">Registros</div><div class="stat-value">' +
                 registros.length +
-                '</div><div class="stat-sub">' +
-                subtitulo +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' +
+                '</div><div class="stat-sub">' + subtitulo + "</div></div>" +
+                '<div class="stat-card accent-green"><span class="stat-icon">&#128176;</span><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' +
                 UI.formatCurrency(totalMonto) +
-                '</div><div class="stat-sub">' +
-                subtitulo +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Urbanas</div><div class="stat-value" style="color:var(--primary)">' +
-                totalUrbanas +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Rurales</div><div class="stat-value" style="color:var(--danger)">' +
-                totalRurales +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Pendientes</div><div class="stat-value" style="color:var(--warning)">' +
-                pendientes +
-                "</div></div>";
+                '</div><div class="stat-sub">' + subtitulo + "</div></div>" +
+                '<div class="stat-card accent-green"><span class="stat-icon">&#128666;</span><div class="stat-label">Entregas</div><div class="stat-value" style="color:#2e7d32">' +
+                totalEntregas + "</div></div>" +
+                '<div class="stat-card accent-blue"><span class="stat-icon">&#9981;</span><div class="stat-label">Recargues</div><div class="stat-value" style="color:#1565c0">' +
+                totalRecargues + "</div></div>" +
+                '<div class="stat-card accent-orange"><span class="stat-icon">&#9200;</span><div class="stat-label">Pendientes</div><div class="stat-value" style="color:#f57c00">' +
+                pendientes + "</div></div>";
 
               if (isAdmin && !filtro.choferId) {
                 statsCards +=
-                  '<div class="stat-card"><div class="stat-label">Choferes activos</div><div class="stat-value">' +
-                  actChoferes +
-                  '</div><div class="stat-sub">de ' +
-                  _choferes.length +
-                  "</div></div>" +
-                  '<div class="stat-card"><div class="stat-label">Camiones activos</div><div class="stat-value">' +
-                  actCamiones +
-                  '</div><div class="stat-sub">de ' +
-                  _camiones.length +
-                  "</div></div>";
+                  '<div class="stat-card accent-purple"><span class="stat-icon">&#128101;</span><div class="stat-label">Choferes activos</div><div class="stat-value">' +
+                  actChoferes + '</div><div class="stat-sub">de ' + _choferes.length + "</div></div>" +
+                  '<div class="stat-card"><span class="stat-icon">&#128652;</span><div class="stat-label">Camiones activos</div><div class="stat-value">' +
+                  actCamiones + '</div><div class="stat-sub">de ' + _camiones.length + "</div></div>";
               }
               statsEl.innerHTML = statsCards;
 
@@ -1361,44 +1468,28 @@
                 .slice(0, 20)
                 .map(function (reg) {
                   return (
-                    "<tr><td>" +
-                    UI.formatDate(reg.fecha) +
-                    "</td>" +
-                    "<td>" +
-                    UI.choferName(_choferes, reg.choferId) +
-                    "</td>" +
-                    "<td>" +
-                    UI.camionPatente(_camiones, reg.camionId) +
-                    "</td>" +
-                    "<td>" +
-                    UI.rutaBadge(reg.tipoRuta) +
-                    "</td>" +
-                    '<td style="text-align:right">' +
-                    UI.formatCurrency(reg.tarifaAplicada) +
-                    "</td>" +
-                    "<td>" +
-                    UI.statusBadge(reg.estado) +
-                    "</td></tr>"
+                    "<tr>" +
+                    '<td data-label="Fecha">' + UI.formatDate(reg.fecha) + "</td>" +
+                    '<td data-label="Chofer">' + UI.choferName(_choferes, reg.choferId) + "</td>" +
+                    '<td data-label="Tipo">' + UI.operacionBadge(reg.tipoOperacion, reg.tipoZona, reg.cantidadRecargues) + "</td>" +
+                    '<td data-label="Placa">' + (reg.placa || "-") + "</td>" +
+                    '<td data-label="Monto" style="text-align:right">' + UI.formatCurrency(reg.tarifaAplicada) + "</td>" +
+                    '<td data-label="Estado">' + UI.statusBadge(reg.estado) + "</td>" +
+                    "</tr>"
                   );
                 })
                 .join("");
-              var tableTitle =
-                "Registros" +
-                (registros.length > 20
-                  ? " (mostrando 20 de " + registros.length + ")"
-                  : " (" + registros.length + ")");
+              var tableTitle = registros.length > 20
+                ? "&#218;ltimos 20 de " + registros.length + " registros"
+                : "Registros (" + registros.length + ")";
               tableEl.innerHTML =
-                '<div class="card"><div class="card-title">' +
-                tableTitle +
-                "</div>" +
+                '<div class="card"><div class="card-title">' + tableTitle + "</div>" +
                 (registros.length === 0
                   ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para el filtro seleccionado</p></div>'
-                  : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th></tr></thead><tbody>' +
-                    rows +
-                    "</tbody>" +
-                    '<tfoot><tr><td colspan="4">Total</td><td style="text-align:right">' +
-                    UI.formatCurrency(totalMonto) +
-                    "</td><td></td></tr></tfoot>" +
+                  : '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Chofer</th><th>Tipo</th><th>Placa</th><th style="text-align:right">Monto</th><th>Estado</th></tr></thead><tbody>' +
+                    rows + "</tbody>" +
+                    '<tfoot><tr><td colspan="4"><strong>Total</strong></td><td style="text-align:right"><strong>' +
+                    UI.formatCurrency(totalMonto) + "</strong></td><td></td></tr></tfoot>" +
                     "</table></div>") +
                 "</div>";
             })
@@ -1440,13 +1531,11 @@
                     "</select>";
                 }
                 container.innerHTML =
-                  '<div class="card" style="margin-bottom:16px"><div class="filter-bar">' +
-                  '<select class="form-control" id="db-mes">' +
-                  monthOptions(ym.mes) +
-                  "</select>" +
-                  '<select class="form-control" id="db-anio">' +
-                  yearOptions(ym.anio) +
-                  "</select>" +
+                  '<div class="card" style="margin-bottom:16px">' +
+                  '<button class="filter-toggle" id="db-filter-toggle">&#9660; Filtros</button>' +
+                  '<div class="filter-collapsible collapsed" id="db-filter-body"><div class="filter-bar">' +
+                  '<select class="form-control" id="db-mes">' + monthOptions(ym.mes) + "</select>" +
+                  '<select class="form-control" id="db-anio">' + yearOptions(ym.anio) + "</select>" +
                   choferFilterHtml +
                   '<select class="form-control" id="db-estado">' +
                   '<option value="">Todos los estados</option>' +
@@ -1455,9 +1544,15 @@
                   '<option value="RECHAZADO">Rechazado</option>' +
                   "</select>" +
                   '<button class="btn btn-primary" id="db-filtrar">Actualizar</button>' +
-                  "</div></div>" +
+                  "</div></div></div>" +
                   '<div class="cards-grid" id="db-stats"></div>' +
                   '<div id="db-table"></div>';
+                var dbToggle = container.querySelector("#db-filter-toggle");
+                var dbFilterBody = container.querySelector("#db-filter-body");
+                dbToggle.onclick = function() {
+                  dbFilterBody.classList.toggle("collapsed");
+                  dbToggle.textContent = dbFilterBody.classList.contains("collapsed") ? "▼ Filtros" : "▲ Filtros";
+                };
                 container.querySelector("#db-filtrar").onclick = function () {
                   var choferEl = container.querySelector("#db-chofer");
                   var filtro = {
@@ -1529,96 +1624,77 @@
               var canEdit = isAdmin || r.choferId === session.choferId;
               var btns = "";
               if (canEdit && r.estado === "PENDIENTE")
-                btns +=
-                  '<button class="btn-icon" data-action="edit" data-id="' +
-                  r.registroId +
-                  '" title="Editar">&#9998;</button>';
+                btns += '<button class="btn-icon" data-action="edit" data-id="' + r.registroId + '" title="Editar">&#9998;</button>';
               if (isAdmin && r.estado === "PENDIENTE")
-                btns +=
-                  '<button class="btn-icon" data-action="validar" data-id="' +
-                  r.registroId +
-                  '" title="Validar">&#10003;</button>';
+                btns += '<button class="btn-icon" data-action="validar" data-id="' + r.registroId + '" title="Validar">&#10003;</button>';
               if (isAdmin && r.estado === "PENDIENTE")
-                btns +=
-                  '<button class="btn-icon" data-action="rechazar" data-id="' +
-                  r.registroId +
-                  '" title="Rechazar">&#10005;</button>';
+                btns += '<button class="btn-icon" data-action="rechazar" data-id="' + r.registroId + '" title="Rechazar">&#10005;</button>';
               if (isAdmin)
-                btns +=
-                  '<button class="btn-icon" data-action="delete" data-id="' +
-                  r.registroId +
-                  '" title="Eliminar">&#128465;</button>';
+                btns += '<button class="btn-icon" data-action="delete" data-id="' + r.registroId + '" title="Eliminar">&#128465;</button>';
               return (
-                "<tr><td>" +
-                UI.formatDate(r.fecha) +
-                "</td><td>" +
-                UI.choferName(_choferes, r.choferId) +
-                "</td><td>" +
-                UI.camionPatente(_camiones, r.camionId) +
-                "</td><td>" +
-                UI.rutaBadge(r.tipoRuta) +
-                "</td><td>" +
-                UI.formatCurrency(r.tarifaAplicada) +
-                "</td><td>" +
-                UI.statusBadge(r.estado) +
-                '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-                (r.observaciones || "-") +
-                '</td><td><div class="action-btns">' +
-                btns +
-                "</div></td></tr>"
+                "<tr>" +
+                '<td data-label="Fecha">' + UI.formatDate(r.fecha) + "</td>" +
+                '<td data-label="Chofer">' + UI.choferName(_choferes, r.choferId) + "</td>" +
+                '<td data-label="Operación">' + UI.operacionBadge(r.tipoOperacion, r.tipoZona, r.cantidadRecargues) + "</td>" +
+                '<td data-label="Placa">' + (r.placa || "-") + "</td>" +
+                '<td data-label="T/R">' + (r.transporte || "-") + " / " + (r.ruta || "-") + "</td>" +
+                '<td data-label="Km">' + (r.kilometraje ? r.kilometraje + " km" : "-") + "</td>" +
+                '<td data-label="Rechazos">' + (r.tieneRechazos ? '<span class="badge" style="background:#fce8e6;color:#b71c1c">Sí</span>' : '<span class="badge" style="background:#e8f5e9;color:#2e7d32">No</span>') + "</td>" +
+                '<td data-label="Monto">' + UI.formatCurrency(r.tarifaAplicada) + "</td>" +
+                '<td data-label="Estado">' + UI.statusBadge(r.estado) + "</td>" +
+                '<td data-label="Acciones"><div class="action-btns">' + btns + "</div></td>" +
+                "</tr>"
               );
             })
             .join("");
 
           var choferSelectHtml = isAdmin
-            ? '<select class="form-control" id="f-chofer">' +
-              choferOpts +
-              "</select>"
+            ? '<select class="form-control" id="f-chofer">' + choferOpts + "</select>"
             : "";
           container.innerHTML =
-            '<div class="card" style="margin-bottom:16px"><div class="toolbar">' +
-            '<div class="filter-bar">' +
-            '<input type="date" class="form-control" id="f-desde" value="' +
-            (_filtro.fechaDesde || "") +
-            '">' +
-            '<input type="date" class="form-control" id="f-hasta" value="' +
-            (_filtro.fechaHasta || "") +
-            '">' +
+            '<div class="card" style="margin-bottom:16px">' +
+            '<button class="filter-toggle" id="reg-filter-toggle">&#9660; Filtros</button>' +
+            '<div class="filter-collapsible collapsed" id="reg-filter-body"><div class="filter-bar">' +
+            '<input type="date" class="form-control" id="f-desde" value="' + (_filtro.fechaDesde || "") + '" placeholder="Desde">' +
+            '<input type="date" class="form-control" id="f-hasta" value="' + (_filtro.fechaHasta || "") + '" placeholder="Hasta">' +
             choferSelectHtml +
             '<select class="form-control" id="f-estado">' +
             '<option value="">Todos los estados</option>' +
-            '<option value="PENDIENTE"' +
-            (_filtro.estado === "PENDIENTE" ? " selected" : "") +
-            ">Pendiente</option>" +
-            '<option value="VALIDADO"' +
-            (_filtro.estado === "VALIDADO" ? " selected" : "") +
-            ">Validado</option>" +
-            '<option value="RECHAZADO"' +
-            (_filtro.estado === "RECHAZADO" ? " selected" : "") +
-            ">Rechazado</option>" +
+            '<option value="PENDIENTE"' + (_filtro.estado === "PENDIENTE" ? " selected" : "") + ">Pendiente</option>" +
+            '<option value="VALIDADO"' + (_filtro.estado === "VALIDADO" ? " selected" : "") + ">Validado</option>" +
+            '<option value="RECHAZADO"' + (_filtro.estado === "RECHAZADO" ? " selected" : "") + ">Rechazado</option>" +
             "</select>" +
-            '<button class="btn btn-secondary" id="btn-filtrar">Filtrar</button>' +
-            '<button class="btn btn-secondary" id="btn-limpiar">Limpiar</button>' +
+            '<div style="display:flex;gap:8px">' +
+            '<button class="btn btn-primary" id="btn-filtrar" style="flex:1">Filtrar</button>' +
+            '<button class="btn btn-secondary" id="btn-limpiar" style="flex:1">Limpiar</button>' +
+            '</div></div></div></div>' +
+            '<div class="card"><div class="toolbar" style="margin-bottom:12px">' +
+            '<div class="card-title" style="margin-bottom:0">Registros (' + _data.length + ")</div>" +
+            '<button class="btn btn-primary" id="btn-nuevo-reg" style="white-space:nowrap">+ Nuevo</button>' +
             "</div>" +
-            '<button class="btn btn-primary" id="btn-nuevo-reg">+ Nuevo Registro</button>' +
-            "</div></div>" +
-            '<div class="card"><div class="card-title">Registros (' +
-            _data.length +
-            ")</div>" +
             (_data.length === 0
               ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para los filtros seleccionados</p></div>'
-              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer</th><th>Cami&#243;n</th><th>Tipo</th><th>Monto</th><th>Estado</th><th>Obs.</th><th>Acciones</th></tr></thead><tbody>' +
-                rows +
-                "</tbody></table></div>") +
-            "</div>";
+              : '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Chofer</th><th>Operaci&#243;n</th><th>Placa</th><th>T/R</th><th>Km</th><th>Rechazos</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' +
+                rows + "</tbody></table></div>") +
+            "</div>" +
+            '<div class="fab-spacer"></div>' +
+            '<button class="fab" id="fab-nuevo-reg" title="Nuevo Registro">+</button>';
+
+          // Toggle filtros en mobile
+          var regFilterToggle = container.querySelector("#reg-filter-toggle");
+          var regFilterBody = container.querySelector("#reg-filter-body");
+          if (regFilterToggle) {
+            regFilterToggle.onclick = function() {
+              regFilterBody.classList.toggle("collapsed");
+              regFilterToggle.textContent = regFilterBody.classList.contains("collapsed") ? "▼ Filtros" : "▲ Filtros";
+            };
+          }
 
           container.querySelector("#btn-filtrar").onclick = function () {
             var choferEl = container.querySelector("#f-chofer");
             _load(container, {
-              fechaDesde:
-                container.querySelector("#f-desde").value || undefined,
-              fechaHasta:
-                container.querySelector("#f-hasta").value || undefined,
+              fechaDesde: container.querySelector("#f-desde").value || undefined,
+              fechaHasta: container.querySelector("#f-hasta").value || undefined,
               choferId: choferEl ? choferEl.value || undefined : undefined,
               estado: container.querySelector("#f-estado").value || undefined,
             });
@@ -1627,11 +1703,9 @@
             _load(container, {});
           };
           var btnNuevo = container.querySelector("#btn-nuevo-reg");
-          if (btnNuevo) {
-            btnNuevo.onclick = function () {
-              _openCreate(container);
-            };
-          }
+          if (btnNuevo) btnNuevo.onclick = function () { _openCreate(container); };
+          var fab = container.querySelector("#fab-nuevo-reg");
+          if (fab) fab.onclick = function () { _openCreate(container); };
 
           container.querySelectorAll("[data-action]").forEach(function (btn) {
             btn.onclick = function () {
@@ -1651,27 +1725,70 @@
         }
 
         function _form(r, fixedChoferId) {
-          var chSel = isAdmin ? UI.choferOptions(_choferes, r ? r.choferId : (fixedChoferId || "")) : "";
-          var caSel = UI.camionOptions(_camiones, r ? r.camionId : "");
-          var tipoU = !r || r.tipoRuta === "URBANA";
           var fecha = r ? (r.fecha || "").split("T")[0] : isoToday();
-          var choferField = isAdmin
-            ? '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="m-chofer"' +
-              (r ? " disabled" : "") + ">" + chSel + "</select></div>"
-            : '<input type="hidden" id="m-chofer" value="' + (fixedChoferId || "") + '">';
+          var op = r ? r.tipoOperacion : "ENTREGA";
+          var zona = r ? r.tipoZona : "URBANO";
+          var cantidad = r ? (r.cantidadRecargues || 1) : 1;
+          var cantOpts = [1,2,3,4,5].map(function(n) {
+            return '<option value="' + n + '"' + (cantidad === n ? " selected" : "") + ">" + n + "</option>";
+          }).join("");
+
+          // Campo Chofer
+          var choferField;
+          if (r) {
+            // Editar: chofer fijo
+            var chSel = isAdmin ? UI.choferOptions(_choferes, r.choferId) : "";
+            choferField = isAdmin
+              ? '<div class="form-group"><label class="form-label">Chofer</label><select class="form-control" id="m-chofer" disabled>' + chSel + '</select></div>'
+              : '<input type="hidden" id="m-chofer" value="' + (fixedChoferId || "") + '">';
+          } else {
+            // Crear: admin elige chofer; chofer ve el suyo fijo
+            var chSel2 = isAdmin ? '<option value="">-- Elige un conductor --</option>' + UI.choferOptions(_choferes, "") : "";
+            choferField = isAdmin
+              ? '<div class="form-group"><label class="form-label">Conductor *</label><select class="form-control" id="m-chofer">' + chSel2 + '</select></div>'
+              : '<input type="hidden" id="m-chofer" value="' + (fixedChoferId || "") + '">';
+          }
+
+          // Campo Placa
+          var placaField;
+          if (r) {
+            // Editar: placa fija como texto
+            placaField = '<div class="form-group"><label class="form-label">Placa</label><input type="text" class="form-control" id="m-placa" value="' + (r.placa || "") + '" disabled></div>';
+          } else if (!isAdmin && fixedChoferId) {
+            // Chofer creando: muestra solo sus camiones
+            var misCamiones = _camiones.filter(function(c) { return c.activo && c.choferId === fixedChoferId; });
+            var placaOpts = misCamiones.length
+              ? misCamiones.map(function(c) { return '<option value="' + c.patente + '">' + c.patente + '</option>'; }).join("")
+              : '<option value="">Sin camiones asignados</option>';
+            placaField = '<div class="form-group"><label class="form-label">Placa *</label><select class="form-control" id="m-placa">' + placaOpts + '</select></div>';
+          } else {
+            // Admin creando: se llena dinámicamente al elegir conductor
+            placaField = '<div class="form-group"><label class="form-label">Placa *</label><select class="form-control" id="m-placa"><option value="">-- Elige un conductor primero --</option></select></div>';
+          }
+
           return (
             '<div class="form-row">' +
-            '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="m-fecha" value="' +
-            fecha + '"></div>' +
-            '<div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="m-tipo"><option value="URBANA"' +
-            (tipoU ? " selected" : "") + '>Urbana</option><option value="RURAL"' +
-            (!tipoU ? " selected" : "") + ">Rural</option></select></div>" +
+            '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="m-fecha" value="' + fecha + '"></div>' +
+            '<div class="form-group"></div>' +
             '</div><div class="form-row">' +
             choferField +
-            '<div class="form-group"><label class="form-label">Cami&#243;n *</label><select class="form-control" id="m-camion"' +
-            (r ? " disabled" : "") + ">" + caSel + "</select></div>" +
-            '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="m-obs" rows="2">' +
-            (r ? r.observaciones || "" : "") + "</textarea></div>"
+            placaField +
+            '</div><div class="form-row">' +
+            '<div class="form-group"><label class="form-label">Transporte *</label><input type="number" class="form-control" id="m-transporte" value="' + (r ? r.transporte || "" : "") + '" placeholder="N\u00famero" maxlength="10"></div>' +
+            '<div class="form-group"><label class="form-label">Ruta *</label><input type="number" class="form-control" id="m-ruta" value="' + (r ? r.ruta || "" : "") + '" placeholder="N\u00famero" maxlength="10"></div>' +
+            '</div><div class="form-row">' +
+            '<div class="form-group"><label class="form-label">Tipo de operaci&#243;n *</label><select class="form-control" id="m-op"><option value="ENTREGA"' + (op === "ENTREGA" ? " selected" : "") + '>Entrega</option><option value="RECARGUE"' + (op === "RECARGUE" ? " selected" : "") + '>Recargue</option></select></div>' +
+            '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="m-zona"><option value="URBANO"' + (zona === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zona === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zona === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option></select></div>' +
+            '</div><div class="form-row" id="m-recargues-row" style="' + (op === "RECARGUE" ? "" : "display:none") + '">' +
+            '<div class="form-group"><label class="form-label">Cantidad de recargues *</label><select class="form-control" id="m-cantidad">' + cantOpts + '</select></div>' +
+            '<div class="form-group"></div>' +
+            '</div><div class="form-row">' +
+            '<div class="form-group"><label class="form-label">Kilometraje *</label><input type="number" class="form-control" id="m-km" value="' + (r ? r.kilometraje || "" : "") + '" placeholder="Km" min="0"></div>' +
+            '<div class="form-group"><label class="form-label">&#191;Tuvo rechazos?</label><select class="form-control" id="m-rechazos"><option value="false"' + (r && r.tieneRechazos ? "" : " selected") + '>No</option><option value="true"' + (r && r.tieneRechazos ? " selected" : "") + '>S\u00ed (-$5)</option></select></div>' +
+            '</div><div class="form-row">' +
+            '<div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="m-obs" rows="2">' + (r ? r.observaciones || "" : "") + "</textarea></div>" +
+            '<div class="form-group"></div>' +
+            "</div>"
           );
         }
 
@@ -1682,19 +1799,32 @@
             body: _form(null, fixedChoferId),
             onSave: function () {
               var fecha = Modal.val("m-fecha"),
-                choferId = Modal.val("m-chofer"),
-                camionId = Modal.val("m-camion");
-              if (!fecha || !choferId || !camionId) {
+                placa = Modal.val("m-placa").toUpperCase(),
+                transporte = Modal.val("m-transporte"),
+                ruta = Modal.val("m-ruta"),
+                km = Modal.val("m-km"),
+                choferId = Modal.val("m-chofer");
+              if (!fecha || !placa || !transporte || !ruta || !km || !choferId) {
                 Toast.error("Completa todos los campos requeridos");
                 return;
               }
+              var camion = _camiones.filter(function(c) { return c.patente.toUpperCase() === placa; })[0];
+              if (!camion) { Toast.error("No se encontró un camión con placa " + placa); return; }
+              var op = Modal.val("m-op");
               Modal.setLoading(true);
               API.registros
                 .crear({
                   fecha: fecha,
                   choferId: choferId,
-                  camionId: camionId,
-                  tipoRuta: Modal.val("m-tipo"),
+                  camionId: camion.camionId,
+                  placa: placa,
+                  transporte: transporte,
+                  ruta: ruta,
+                  tipoOperacion: op,
+                  tipoZona: Modal.val("m-zona"),
+                  cantidadRecargues: op === "RECARGUE" ? parseInt(Modal.val("m-cantidad")) || 1 : 1,
+                  kilometraje: parseFloat(km) || 0,
+                  tieneRechazos: Modal.val("m-rechazos") === "true",
                   observaciones: Modal.val("m-obs") || undefined,
                   origen: "MANUAL",
                 })
@@ -1710,26 +1840,24 @@
             },
           });
 
-          var camionSel = Modal._el.querySelector("#m-camion");
-          function _updateCamiones(cId) {
-            var filtrados = _camiones.filter(function (c) {
-              return c.activo && c.choferId === cId;
-            });
-            camionSel.innerHTML =
-              filtrados.length > 0
-                ? filtrados.map(function (c) {
-                    return '<option value="' + c.camionId + '">' + c.patente +
-                      (c.modelo ? " &mdash; " + c.modelo : "") + "</option>";
-                  }).join("")
-                : '<option value="">Sin cami&#243;n asignado</option>';
-          }
+          // Mostrar/ocultar cantidad de recargues según operación
+          var opSel = Modal._el.querySelector("#m-op");
+          var cantRow = Modal._el.querySelector("#m-recargues-row");
+          opSel.addEventListener("change", function () {
+            cantRow.style.display = opSel.value === "RECARGUE" ? "" : "none";
+          });
 
+          // Admin: al cambiar conductor, actualizar placas disponibles
           if (isAdmin) {
             var choferSel = Modal._el.querySelector("#m-chofer");
-            choferSel.addEventListener("change", function () { _updateCamiones(choferSel.value); });
-            _updateCamiones(choferSel.value);
-          } else {
-            _updateCamiones(fixedChoferId);
+            var placaSel = Modal._el.querySelector("#m-placa");
+            choferSel.addEventListener("change", function () {
+              var cId = choferSel.value;
+              var cams = cId ? _camiones.filter(function(c) { return c.activo && c.choferId === cId; }) : [];
+              placaSel.innerHTML = cams.length
+                ? cams.map(function(c) { return '<option value="' + c.patente + '">' + c.patente + '</option>'; }).join("")
+                : '<option value="">Sin camiones asignados</option>';
+            });
           }
         }
 
@@ -1738,11 +1866,18 @@
             title: "Editar Registro",
             body: _form(r),
             onSave: function () {
+              var op = Modal.val("m-op");
               Modal.setLoading(true);
               API.registros
                 .actualizar(r.registroId, {
                   fecha: Modal.val("m-fecha") || undefined,
-                  tipoRuta: Modal.val("m-tipo") || undefined,
+                  transporte: Modal.val("m-transporte") || undefined,
+                  ruta: Modal.val("m-ruta") || undefined,
+                  tipoOperacion: op || undefined,
+                  tipoZona: Modal.val("m-zona") || undefined,
+                  cantidadRecargues: op === "RECARGUE" ? parseInt(Modal.val("m-cantidad")) || 1 : 1,
+                  kilometraje: parseFloat(Modal.val("m-km")) || undefined,
+                  tieneRechazos: Modal.val("m-rechazos") === "true",
                   observaciones: Modal.val("m-obs") || undefined,
                 })
                 .then(function () {
@@ -1756,6 +1891,14 @@
                 });
             },
           });
+
+          var opSel = Modal._el.querySelector("#m-op");
+          var cantRow = Modal._el.querySelector("#m-recargues-row");
+          if (opSel && cantRow) {
+            opSel.addEventListener("change", function () {
+              cantRow.style.display = opSel.value === "RECARGUE" ? "" : "none";
+            });
+          }
         }
 
         function _confirmValidar(container, id, estado) {
@@ -1843,42 +1986,28 @@
               var regRows = d.registros
                 .map(function (r) {
                   return (
-                    "<tr><td>" +
-                    r.fecha +
-                    "</td><td>" +
-                    r.camionPatente +
-                    "</td><td>" +
-                    UI.rutaBadge(r.tipoRuta) +
-                    '</td><td style="text-align:right">' +
-                    UI.formatCurrency(r.tarifaAplicada) +
-                    "</td><td>" +
-                    UI.statusBadge(r.estado) +
-                    '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-                    (r.observaciones || "-") +
-                    "</td></tr>"
+                    "<tr>" +
+                    '<td data-label="Fecha">' + r.fecha + "</td>" +
+                    '<td data-label="Placa">' + (r.placa || r.camionPatente || "-") + "</td>" +
+                    '<td data-label="Operación">' + UI.operacionBadge(r.tipoOperacion, r.tipoZona, r.cantidadRecargues) + "</td>" +
+                    '<td data-label="Rechazos">' + (r.tieneRechazos ? '<span class="badge" style="background:#fce8e6;color:#b71c1c">Sí</span>' : "No") + "</td>" +
+                    '<td data-label="Monto">' + UI.formatCurrency(r.tarifaAplicada) + "</td>" +
+                    '<td data-label="Estado">' + UI.statusBadge(r.estado) + "</td>" +
+                    "</tr>"
                   );
                 })
                 .join("");
               var body =
-                '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">' +
-                '<div class="stat-card" style="padding:12px"><div class="stat-label">Total</div><div class="stat-value" style="font-size:22px">' +
-                d.totalRegistros +
-                "</div></div>" +
-                '<div class="stat-card" style="padding:12px"><div class="stat-label">Urbanas</div><div class="stat-value" style="font-size:22px;color:var(--primary)">' +
-                d.totalUrbanas +
-                "</div></div>" +
-                '<div class="stat-card" style="padding:12px"><div class="stat-label">Rurales</div><div class="stat-value" style="font-size:22px;color:var(--danger)">' +
-                d.totalRurales +
-                "</div></div>" +
-                '<div class="stat-card" style="padding:12px"><div class="stat-label">Monto</div><div class="stat-value" style="font-size:18px">' +
-                UI.formatCurrency(d.montoTotal) +
-                "</div></div>" +
+                '<div class="stats-grid-4">' +
+                '<div class="stat-card"><div class="stat-label">Total</div><div class="stat-value">' + d.totalRegistros + "</div></div>" +
+                '<div class="stat-card accent-green"><div class="stat-label">Entregas</div><div class="stat-value" style="color:#2e7d32">' + (d.totalEntregas || 0) + "</div></div>" +
+                '<div class="stat-card accent-blue"><div class="stat-label">Recargues</div><div class="stat-value" style="color:#1565c0">' + (d.totalRecargues || 0) + "</div></div>" +
+                '<div class="stat-card accent-green"><div class="stat-label">Monto</div><div class="stat-value" style="font-size:18px">' + UI.formatCurrency(d.montoTotal) + "</div></div>" +
                 "</div>" +
                 (d.registros.length === 0
                   ? '<div class="empty-state"><p>Sin registros en este per\u00edodo</p></div>'
-                  : '<div class="table-wrapper" style="max-height:320px;overflow-y:auto"><table><thead><tr><th>Fecha</th><th>Cami\u00f3n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' +
-                    regRows +
-                    "</tbody></table></div>");
+                  : '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Placa</th><th>Operaci\u00f3n</th><th>Rechazos</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' +
+                    regRows + "</tbody></table></div>");
               if (Modal._el)
                 Modal._el.querySelector(".modal-body").innerHTML = body;
             })
@@ -1907,40 +2036,24 @@
               var regRows = (d.registros || [])
                 .map(function (r) {
                   return (
-                    "<tr><td>" +
-                    r.fecha +
-                    "</td><td>" +
-                    r.camionPatente +
-                    "</td><td>" +
-                    UI.rutaBadge(r.tipoRuta) +
-                    '</td><td style="text-align:right">' +
-                    UI.formatCurrency(r.tarifaAplicada) +
-                    "</td><td>" +
+                    "<tr>" +
+                    '<td data-label="Fecha">' + r.fecha + "</td>" +
+                    '<td data-label="Placa">' + (r.placa || r.camionPatente || "-") + "</td>" +
+                    '<td data-label="Operación">' + UI.operacionBadge(r.tipoOperacion, r.tipoZona, r.cantidadRecargues) + "</td>" +
+                    '<td data-label="Rechazos">' + (r.tieneRechazos ? '<span class="badge" style="background:#fce8e6;color:#b71c1c">Sí</span>' : "No") + "</td>" +
+                    '<td data-label="Monto">' + UI.formatCurrency(r.tarifaAplicada) + "</td>" +
+                    '<td data-label="Estado">' +
                     UI.statusBadge(r.estado) +
-                    '</td><td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-                    (r.observaciones || "-") +
                     "</td></tr>"
                   );
                 })
                 .join("");
               el.innerHTML =
                 '<div class="cards-grid" style="margin-bottom:16px">' +
-                '<div class="stat-card"><div class="stat-label">Registros</div><div class="stat-value">' +
-                d.totalRegistros +
-                '</div><div class="stat-sub">' +
-                monthName +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Urbanas</div><div class="stat-value" style="color:var(--primary)">' +
-                d.totalUrbanas +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Rurales</div><div class="stat-value" style="color:var(--danger)">' +
-                d.totalRurales +
-                "</div></div>" +
-                '<div class="stat-card"><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' +
-                UI.formatCurrency(d.montoTotal) +
-                '</div><div class="stat-sub">' +
-                monthName +
-                "</div></div>" +
+                '<div class="stat-card"><span class="stat-icon">&#128203;</span><div class="stat-label">Registros</div><div class="stat-value">' + d.totalRegistros + '</div><div class="stat-sub">' + monthName + "</div></div>" +
+                '<div class="stat-card accent-green"><span class="stat-icon">&#128666;</span><div class="stat-label">Entregas</div><div class="stat-value" style="color:#2e7d32">' + (d.totalEntregas || 0) + "</div></div>" +
+                '<div class="stat-card accent-blue"><span class="stat-icon">&#9981;</span><div class="stat-label">Recargues</div><div class="stat-value" style="color:#1565c0">' + (d.totalRecargues || 0) + "</div></div>" +
+                '<div class="stat-card accent-green"><span class="stat-icon">&#128176;</span><div class="stat-label">Monto total</div><div class="stat-value" style="font-size:22px">' + UI.formatCurrency(d.montoTotal) + '</div><div class="stat-sub">' + monthName + "</div></div>" +
                 "</div>" +
                 '<div class="card"><div class="toolbar" style="margin-bottom:8px"><div class="card-title" style="margin-bottom:0">Mis Registros &mdash; ' +
                 monthName +
@@ -1951,9 +2064,8 @@
                 "</div></div>" +
                 (d.registros.length === 0
                   ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros en este per\u00edodo</p></div>'
-                  : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Cami\u00f3n</th><th>Tipo</th><th style="text-align:right">Monto</th><th>Estado</th><th>Obs.</th></tr></thead><tbody>' +
-                    regRows +
-                    "</tbody></table></div>") +
+                  : '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Placa</th><th>Operaci\u00f3n</th><th>Rechazos</th><th>Monto</th><th>Estado</th></tr></thead><tbody>' +
+                    regRows + "</tbody></table></div>") +
                 "</div>";
 
               el.querySelector("#btn-ch-xls").onclick = function () {
@@ -2027,10 +2139,10 @@
                     (r.totalRegistros || 0) +
                     "</td>" +
                     '<td style="text-align:center">' +
-                    (r.totalUrbanas || 0) +
+                    (r.totalEntregas || 0) +
                     "</td>" +
                     '<td style="text-align:center">' +
-                    (r.totalRurales || 0) +
+                    (r.totalRecargues || 0) +
                     "</td>" +
                     '<td style="text-align:right;font-weight:500">' +
                     UI.formatCurrency(r.montoTotal) +
@@ -2077,16 +2189,16 @@
                 "</div>" +
                 '<button class="btn btn-xls btn-export-all" id="btn-export-all" title="Exportar resumen completo en Excel">XLS Global</button></div>' +
                 '<div class="table-wrapper"><table>' +
-                '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Urbanas</th><th style="text-align:center">Rurales</th><th style="text-align:right">Monto</th><th>Acciones</th></tr></thead>' +
+                '<thead><tr><th>Chofer</th><th style="text-align:center">Total</th><th style="text-align:center">Entregas</th><th style="text-align:center">Recargues</th><th style="text-align:right">Monto</th><th>Acciones</th></tr></thead>' +
                 "<tbody>" +
                 rows +
                 "</tbody>" +
                 '<tfoot><tr><td>TOTAL</td><td style="text-align:center">' +
                 data.totalRegistros +
                 '</td><td style="text-align:center">' +
-                data.totalUrbanas +
+                (data.totalEntregas || 0) +
                 '</td><td style="text-align:center">' +
-                data.totalRurales +
+                (data.totalRecargues || 0) +
                 '</td><td style="text-align:right">' +
                 UI.formatCurrency(data.montoTotal) +
                 "</td><td></td></tr></tfoot>" +
@@ -2201,7 +2313,7 @@
                 .map(function (t) {
                   return (
                     "<tr><td>" +
-                    UI.rutaBadge(t.tipoRuta) +
+                    UI.operacionBadge(t.tipoOperacion, t.tipoZona, 1) +
                     "</td><td><strong>" +
                     UI.formatCurrency(t.valor) +
                     "</strong></td><td>" +
@@ -2219,7 +2331,7 @@
                 .map(function (t) {
                   return (
                     "<tr><td>" +
-                    UI.rutaBadge(t.tipoRuta) +
+                    UI.operacionBadge(t.tipoOperacion, t.tipoZona, 1) +
                     "</td><td>" +
                     UI.formatCurrency(t.valor) +
                     "</td><td>" +
@@ -2239,13 +2351,13 @@
                 '<div class="card" style="margin-bottom:16px"><div class="card-title">Tarifas Vigentes</div>' +
                 (activas.length === 0
                   ? '<div class="empty-state"><p>Sin tarifas activas</p></div>'
-                  : '<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Valor</th><th>Descripci&#243;n</th><th>Desde</th><th>Estado</th></tr></thead><tbody>' +
+                  : '<div class="table-wrapper"><table><thead><tr><th>Operaci&#243;n / Zona</th><th>Valor base</th><th>Descripci&#243;n</th><th>Desde</th><th>Estado</th></tr></thead><tbody>' +
                     actRows +
                     "</tbody></table></div>") +
                 '</div><div class="card"><div class="card-title">Historial</div>' +
                 (hist.length === 0
                   ? '<div class="empty-state"><p>Sin historial</p></div>'
-                  : '<div class="table-wrapper"><table><thead><tr><th>Tipo</th><th>Valor</th><th>Descripci&#243;n</th><th>Desde</th><th>Hasta</th></tr></thead><tbody>' +
+                  : '<div class="table-wrapper"><table><thead><tr><th>Operaci&#243;n / Zona</th><th>Valor</th><th>Descripci&#243;n</th><th>Desde</th><th>Hasta</th></tr></thead><tbody>' +
                     histRows +
                     "</tbody></table></div>") +
                 "</div>";
@@ -2254,22 +2366,26 @@
                   Modal.show({
                     title: "Nueva Tarifa",
                     body:
-                      '<div class="form-row"><div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="t-tipo"><option value="URBANA">Urbana</option><option value="RURAL">Rural</option></select></div><div class="form-group"><label class="form-label">Valor ($) *</label><input type="number" class="form-control" id="t-valor" step="0.01" min="0" placeholder="0.00"></div></div><div class="form-group"><label class="form-label">Descripci&#243;n *</label><input type="text" class="form-control" id="t-desc" placeholder="Ej: Tarifa urbana 2025"></div><div class="form-group"><label class="form-label">Vigencia desde</label><input type="date" class="form-control" id="t-vig" value="' +
-                      isoToday() +
-                      '"></div>',
+                      '<div class="form-row">' +
+                      '<div class="form-group"><label class="form-label">Tipo de operaci&#243;n *</label><select class="form-control" id="t-op"><option value="ENTREGA">Entrega</option><option value="RECARGUE">Recargue</option></select></div>' +
+                      '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="t-zona"><option value="URBANO">Urbano</option><option value="FORANEO">For&#225;neo</option><option value="EXTRAFORANEO">Extrafor&#225;neo</option></select></div>' +
+                      '</div><div class="form-row">' +
+                      '<div class="form-group"><label class="form-label">Valor base ($) *</label><input type="number" class="form-control" id="t-valor" step="0.01" min="0" placeholder="0.00"></div>' +
+                      '<div class="form-group"><label class="form-label">Vigencia desde</label><input type="date" class="form-control" id="t-vig" value="' + isoToday() + '"></div>' +
+                      '</div><div class="form-group"><label class="form-label">Descripci&#243;n</label><input type="text" class="form-control" id="t-desc" placeholder="Ej: Entrega Urbano 2026"></div>',
                     onSave: function () {
-                      var valor = parseFloat(Modal.val("t-valor")),
-                        desc = Modal.val("t-desc");
-                      if (!desc || isNaN(valor)) {
-                        Toast.error("Completa todos los campos");
+                      var valor = parseFloat(Modal.val("t-valor"));
+                      if (isNaN(valor) || valor <= 0) {
+                        Toast.error("Ingresa un valor válido");
                         return;
                       }
                       Modal.setLoading(true);
                       API.tarifas
                         .crear({
-                          tipoRuta: Modal.val("t-tipo"),
+                          tipoOperacion: Modal.val("t-op"),
+                          tipoZona: Modal.val("t-zona"),
                           valor: valor,
-                          descripcion: desc,
+                          descripcion: Modal.val("t-desc") || (Modal.val("t-op") + " " + Modal.val("t-zona")),
                           fechaVigencia: Modal.val("t-vig") || undefined,
                         })
                         .then(function () {
@@ -2998,7 +3114,7 @@
             '<div class="card"><div class="card-title">Errores del Formulario</div>' +
             (_data.length === 0
               ? '<div class="empty-state"><div class="empty-state-icon">&#10003;</div><p>Sin errores pendientes</p></div>'
-              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Chofer (email)</th><th>Error</th><th>Datos enviados</th><th>Estado</th><th>Resuelto por</th><th>Acciones</th></tr></thead><tbody>' +
+              : '<div class="table-wrapper"><table><thead><tr><th>Fecha</th><th>Placa / Ref.</th><th>Error</th><th>Datos enviados</th><th>Estado</th><th>Resuelto por</th><th>Acciones</th></tr></thead><tbody>' +
                 rows +
                 "</tbody></table></div>") +
             "</div>";
@@ -3024,7 +3140,7 @@
               try { rawObj = JSON.parse(err.rawValues || "[]"); } catch (_) {}
               var rawHtml = "";
               if (Array.isArray(rawObj) && rawObj.length > 0) {
-                var labels = ["Timestamp", "Email", "Fecha", "Patente", "Tipo Ruta", "Observaciones"];
+                var labels = ["Timestamp", "Transporte", "Ruta", "Placa", "Tipo Operación", "Tipo Zona", "Cantidad Recargues", "Kilometraje", "Rechazos", "Observaciones"];
                 rawObj.forEach(function (v, i) {
                   rawHtml +=
                     '<div style="display:flex;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0">' +
@@ -3051,7 +3167,7 @@
                   '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">FECHA</div>' +
                   '<div>' + UI.formatDateTime(err.timestamp) + "</div></div>" +
                   '<div style="margin-bottom:12px">' +
-                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">EMAIL</div>' +
+                  '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">PLACA / REFERENCIA</div>' +
                   '<div>' + (err.emailChofer || "-") + "</div></div>" +
                   '<div style="margin-bottom:12px">' +
                   '<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px">ESTADO</div>' +
@@ -3109,83 +3225,79 @@
 
         function _openCrear(container, err) {
           // Parsear rawValues para pre-rellenar campos
+          // Nuevo orden: [0]=timestamp, [1]=transporte, [2]=ruta, [3]=placa, [4]=tipoOp, [5]=tipoZona, [6]=cantidad, [7]=km, [8]=rechazos, [9]=obs
           var rawArr = [];
-          try {
-            rawArr = JSON.parse(err.rawValues || "[]");
-          } catch (_) {}
-          // Orden: [0]=timestamp, [1]=email, [2]=fecha, [3]=patente, [4]=tipoRuta, [5]=obs
-          var fechaRaw = rawArr[2] || "";
-          var tipoRutaRaw = (rawArr[4] || "URBANA").toUpperCase();
-          var obsRaw = rawArr[5] || "";
-          // Convertir fecha DD/MM/YYYY → YYYY-MM-DD
-          var fechaISO = fechaRaw;
-          var partes = fechaRaw.split("/");
-          if (partes.length === 3)
-            fechaISO =
-              partes[2] +
-              "-" +
-              partes[1].padStart(2, "0") +
-              "-" +
-              partes[0].padStart(2, "0");
+          try { rawArr = JSON.parse(err.rawValues || "[]"); } catch (_) {}
+          var placaRaw = (rawArr[3] || "").toUpperCase();
+          var opRaw = (rawArr[4] || "ENTREGA").toUpperCase();
+          var zonaRaw = (rawArr[5] || "URBANO").toUpperCase();
+          var cantidadRaw = parseInt(rawArr[6]) || 1;
+          var kmRaw = rawArr[7] || "";
+          var obsRaw = rawArr[9] || "";
+          var transporteRaw = rawArr[1] || "";
+          var rutaRaw = rawArr[2] || "";
 
-          var chSel = UI.choferOptions(_choferes, err.choferId || "");
-          var caSel = UI.camionOptions(_camiones, "");
-          var tipoU = tipoRutaRaw !== "RURAL";
+          // Resolver camión por placa
+          var camionPre = placaRaw ? _camiones.filter(function(c) { return c.patente.toUpperCase() === placaRaw; })[0] : null;
+          var chSel = UI.choferOptions(_choferes, camionPre ? camionPre.choferId : (err.choferId || ""));
+          var cantOpts = [1,2,3,4,5].map(function(n) {
+            return '<option value="' + n + '"' + (cantidadRaw === n ? " selected" : "") + ">" + n + "</option>";
+          }).join("");
 
           Modal.show({
             title: "Crear Registro desde Error",
             body:
-              '<p style="margin-bottom:12px;color:var(--text-muted);font-size:13px">Error original: <em>' +
-              err.mensajeError +
-              "</em></p>" +
+              '<p style="margin-bottom:12px;color:var(--text-muted);font-size:13px">Error: <em>' + err.mensajeError + "</em></p>" +
               '<div class="form-row">' +
-              '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="fe-fecha" value="' +
-              fechaISO +
-              '"></div>' +
-              '<div class="form-group"><label class="form-label">Tipo de Ruta *</label><select class="form-control" id="fe-tipo"><option value="URBANA"' +
-              (tipoU ? " selected" : "") +
-              '>Urbana</option><option value="RURAL"' +
-              (!tipoU ? " selected" : "") +
-              ">Rural</option></select></div>" +
+              '<div class="form-group"><label class="form-label">Fecha *</label><input type="date" class="form-control" id="fe-fecha" value="' + isoToday() + '"></div>' +
+              '<div class="form-group"><label class="form-label">Placa *</label><input type="text" class="form-control" id="fe-placa" value="' + placaRaw + '" placeholder="RBH-1239"></div>' +
               '</div><div class="form-row">' +
-              '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="fe-chofer">' +
-              chSel +
-              "</select></div>" +
-              '<div class="form-group"><label class="form-label">Cami&#243;n *</label><select class="form-control" id="fe-camion">' +
-              caSel +
-              "</select></div>" +
-              '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="fe-obs" rows="2">' +
-              obsRaw +
-              "</textarea></div>",
+              '<div class="form-group"><label class="form-label">Transporte *</label><input type="number" class="form-control" id="fe-transporte" value="' + transporteRaw + '"></div>' +
+              '<div class="form-group"><label class="form-label">Ruta *</label><input type="number" class="form-control" id="fe-ruta" value="' + rutaRaw + '"></div>' +
+              '</div><div class="form-row">' +
+              '<div class="form-group"><label class="form-label">Operaci&#243;n *</label><select class="form-control" id="fe-op"><option value="ENTREGA"' + (opRaw === "ENTREGA" ? " selected" : "") + '>Entrega</option><option value="RECARGUE"' + (opRaw === "RECARGUE" ? " selected" : "") + '>Recargue</option></select></div>' +
+              '<div class="form-group"><label class="form-label">Zona *</label><select class="form-control" id="fe-zona"><option value="URBANO"' + (zonaRaw === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zonaRaw === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zonaRaw === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option></select></div>' +
+              '</div><div class="form-row" id="fe-cant-row" style="' + (opRaw === "RECARGUE" ? "" : "display:none") + '">' +
+              '<div class="form-group"><label class="form-label">Cantidad recargues</label><select class="form-control" id="fe-cantidad">' + cantOpts + '</select></div>' +
+              '<div class="form-group"></div>' +
+              '</div><div class="form-row">' +
+              '<div class="form-group"><label class="form-label">Chofer *</label><select class="form-control" id="fe-chofer">' + chSel + '</select></div>' +
+              '<div class="form-group"><label class="form-label">Kilometraje</label><input type="number" class="form-control" id="fe-km" value="' + kmRaw + '"></div>' +
+              '</div><div class="form-group"><label class="form-label">Observaciones</label><textarea class="form-control" id="fe-obs" rows="2">' + obsRaw + "</textarea></div>",
             onSave: function () {
               var fecha = Modal.val("fe-fecha");
+              var placa = Modal.val("fe-placa").toUpperCase();
               var choferId = Modal.val("fe-chofer");
-              var camionId = Modal.val("fe-camion");
-              if (!fecha || !choferId || !camionId) {
+              if (!fecha || !placa || !choferId) {
                 Toast.error("Completa todos los campos requeridos");
                 return;
               }
+              var camion = _camiones.filter(function(c) { return c.patente.toUpperCase() === placa; })[0];
+              if (!camion) { Toast.error("No se encontró camión con placa " + placa); return; }
+              var op = Modal.val("fe-op");
               Modal.setLoading(true);
               API.registros
                 .crear({
                   fecha: fecha,
                   choferId: choferId,
-                  camionId: camionId,
-                  tipoRuta: Modal.val("fe-tipo"),
+                  camionId: camion.camionId,
+                  placa: placa,
+                  transporte: Modal.val("fe-transporte"),
+                  ruta: Modal.val("fe-ruta"),
+                  tipoOperacion: op,
+                  tipoZona: Modal.val("fe-zona"),
+                  cantidadRecargues: op === "RECARGUE" ? parseInt(Modal.val("fe-cantidad")) || 1 : 1,
+                  kilometraje: parseFloat(Modal.val("fe-km")) || 0,
+                  tieneRechazos: false,
                   observaciones: Modal.val("fe-obs") || undefined,
                   origen: "MANUAL",
                 })
                 .then(function (reg) {
-                  return API.formErrores.marcarResuelto(
-                    err.errorId,
-                    reg.registroId,
-                  );
+                  return API.formErrores.marcarResuelto(err.errorId, reg.registroId);
                 })
                 .then(function () {
                   Modal.hide();
-                  Toast.success(
-                    "Registro creado y error marcado como resuelto",
-                  );
+                  Toast.success("Registro creado y error marcado como resuelto");
                   _load(container);
                 })
                 .catch(function (e) {
@@ -3195,32 +3307,11 @@
             },
           });
 
-          // Filtrar camiones al cambiar chofer
-          var choferSel = Modal._el.querySelector("#fe-chofer");
-          var camionSel = Modal._el.querySelector("#fe-camion");
-          function _updateCamiones() {
-            var cId = choferSel.value;
-            var filtrados = _camiones.filter(function (c) {
-              return c.activo && c.choferId === cId;
-            });
-            camionSel.innerHTML =
-              filtrados.length > 0
-                ? filtrados
-                    .map(function (c) {
-                      return (
-                        '<option value="' +
-                        c.camionId +
-                        '">' +
-                        c.patente +
-                        (c.modelo ? " &mdash; " + c.modelo : "") +
-                        "</option>"
-                      );
-                    })
-                    .join("")
-                : '<option value="">Sin cami&#243;n asignado</option>';
-          }
-          choferSel.addEventListener("change", _updateCamiones);
-          _updateCamiones();
+          var opSel = Modal._el.querySelector("#fe-op");
+          var cantRow = Modal._el.querySelector("#fe-cant-row");
+          opSel.addEventListener("change", function() {
+            cantRow.style.display = opSel.value === "RECARGUE" ? "" : "none";
+          });
         }
 
         return {

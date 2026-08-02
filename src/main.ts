@@ -62,3 +62,12 @@ function installTriggers(): void {
 function listTriggers(): void {
   TriggerSetup.list();
 }
+
+/**
+ * Migra hojas existentes agregando columnas faltantes al final.
+ * Seguro ejecutar en producción: nunca borra datos ni columnas.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function migrateSheets(): void {
+  Setup.migrateSheets();
+}

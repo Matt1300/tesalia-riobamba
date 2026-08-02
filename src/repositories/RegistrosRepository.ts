@@ -12,7 +12,14 @@ namespace RegistrosRepository {
       fecha: DateUtils.fromSheetValue(row[C.FECHA]),
       choferId: String(row[C.CHOFER_ID]),
       camionId: String(row[C.CAMION_ID]),
-      tipoRuta: String(row[C.TIPO_RUTA]) as Models.TipoRuta,
+      placa: String(row[C.PLACA] ?? ''),
+      transporte: String(row[C.TRANSPORTE] ?? ''),
+      ruta: String(row[C.RUTA] ?? ''),
+      tipoOperacion: String(row[C.TIPO_OPERACION]) as Models.TipoOperacion,
+      tipoZona: String(row[C.TIPO_ZONA]) as Models.TipoZona,
+      cantidadRecargues: NumberUtils.fromSheetInt(row[C.CANTIDAD_RECARGUES]) || 1,
+      kilometraje: NumberUtils.fromSheetValue(row[C.KILOMETRAJE]),
+      tieneRechazos: row[C.TIENE_RECHAZOS] === true || String(row[C.TIENE_RECHAZOS]).toUpperCase() === 'TRUE' || row[C.TIENE_RECHAZOS] === 'Sí' || row[C.TIENE_RECHAZOS] === 'SI',
       tarifaAplicada: NumberUtils.fromSheetValue(row[C.TARIFA_APLICADA]),
       observaciones: String(row[C.OBSERVACIONES] ?? ''),
       origen: String(row[C.ORIGEN]) as Models.OrigenRegistro,
@@ -33,7 +40,14 @@ namespace RegistrosRepository {
       DateUtils.toISODate(r.fecha),
       r.choferId,
       r.camionId,
-      r.tipoRuta,
+      r.placa,
+      r.transporte,
+      r.ruta,
+      r.tipoOperacion,
+      r.tipoZona,
+      r.cantidadRecargues,
+      r.kilometraje,
+      r.tieneRechazos,
       r.tarifaAplicada,
       r.observaciones,
       r.origen,
@@ -69,7 +83,8 @@ namespace RegistrosRepository {
     return findAll().filter(r => {
       if (filtro.choferId && r.choferId !== filtro.choferId) return false;
       if (filtro.camionId && r.camionId !== filtro.camionId) return false;
-      if (filtro.tipoRuta && r.tipoRuta !== filtro.tipoRuta) return false;
+      if (filtro.tipoOperacion && r.tipoOperacion !== filtro.tipoOperacion) return false;
+      if (filtro.tipoZona && r.tipoZona !== filtro.tipoZona) return false;
       if (filtro.estado && r.estado !== filtro.estado) return false;
       if (filtro.fechaDesde && r.fecha < DateUtils.parseISODate(filtro.fechaDesde)) return false;
       if (filtro.fechaHasta && r.fecha > DateUtils.parseISODate(filtro.fechaHasta)) return false;

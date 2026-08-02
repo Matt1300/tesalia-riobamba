@@ -9,7 +9,8 @@ namespace TarifasRepository {
   function rowToTarifa(row: unknown[]): Models.Tarifa {
     return {
       tarifaId: String(row[C.TARIFA_ID]),
-      tipoRuta: String(row[C.TIPO_RUTA]) as Models.TipoRuta,
+      tipoOperacion: String(row[C.TIPO_OPERACION]) as Models.TipoOperacion,
+      tipoZona: String(row[C.TIPO_ZONA]) as Models.TipoZona,
       valor: NumberUtils.fromSheetValue(row[C.VALOR]),
       descripcion: String(row[C.DESCRIPCION] ?? ''),
       fechaVigencia: DateUtils.fromSheetValue(row[C.FECHA_VIGENCIA]),
@@ -25,7 +26,8 @@ namespace TarifasRepository {
   function tarifaToRow(t: Models.Tarifa): unknown[] {
     return [
       t.tarifaId,
-      t.tipoRuta,
+      t.tipoOperacion,
+      t.tipoZona,
       t.valor,
       t.descripcion,
       DateUtils.toISODate(t.fechaVigencia),
@@ -40,12 +42,13 @@ namespace TarifasRepository {
     return BaseRepository.getAllRows(SHEET).map(rowToTarifa);
   }
 
-  /** Retorna la tarifa activa para un tipo de ruta. */
-  export function findVigente(tipoRuta: Models.TipoRuta): Models.Tarifa | null {
+  /** Retorna la tarifa activa para un tipo de operación y zona. */
+  export function findVigente(tipoOperacion: Models.TipoOperacion, tipoZona: Models.TipoZona): Models.Tarifa | null {
     const rows = BaseRepository.filterRows(
       SHEET,
       row =>
-        String(row[C.TIPO_RUTA]) === tipoRuta &&
+        String(row[C.TIPO_OPERACION]) === tipoOperacion &&
+        String(row[C.TIPO_ZONA]) === tipoZona &&
         (row[C.ACTIVO] === true || row[C.ACTIVO] === 'TRUE')
     );
     if (rows.length === 0) return null;
@@ -60,13 +63,14 @@ namespace TarifasRepository {
     BaseRepository.appendRow(SHEET, tarifaToRow(tarifa));
   }
 
-  /** Desactiva todas las tarifas del tipo de ruta antes de agregar una nueva. */
-  export function deactivateByTipoRuta(tipoRuta: Models.TipoRuta): void {
+  /** Desactiva todas las tarifas del mismo tipo+zona antes de agregar una nueva. */
+  export function deactivateByTipo(tipoOperacion: Models.TipoOperacion, tipoZona: Models.TipoZona): void {
     const rows = BaseRepository.getAllRows(SHEET);
     const C_local = C;
     rows.forEach((row, idx) => {
       if (
-        String(row[C_local.TIPO_RUTA]) === tipoRuta &&
+        String(row[C_local.TIPO_OPERACION]) === tipoOperacion &&
+        String(row[C_local.TIPO_ZONA]) === tipoZona &&
         (row[C_local.ACTIVO] === true || row[C_local.ACTIVO] === 'TRUE')
       ) {
         BaseRepository.softDelete(SHEET, idx, C_local.ACTIVO);

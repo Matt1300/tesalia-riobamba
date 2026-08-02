@@ -4,20 +4,39 @@
  */
 namespace TarifaService {
   /**
-   * Obtiene el valor vigente para un tipo de ruta.
+   * Obtiene el valor base vigente para un tipo de operación y zona.
    * Lanza error si no hay tarifa configurada.
    */
-  export function getValorVigente(tipoRuta: Models.TipoRuta): number {
-    const tarifa = TarifasRepository.findVigente(tipoRuta);
+  export function getValorVigente(tipoOperacion: Models.TipoOperacion, tipoZona: Models.TipoZona): number {
+    const tarifa = TarifasRepository.findVigente(tipoOperacion, tipoZona);
     if (!tarifa) {
       throw new Error(
-        `No existe tarifa activa para el tipo de ruta "${tipoRuta}". Configure las tarifas primero.`
+        `No existe tarifa activa para ${tipoOperacion} / ${tipoZona}. Configure las tarifas primero.`
       );
     }
     return tarifa.valor;
   }
 
-  /** Retorna todas las tarifas activas (una por tipo de ruta). */
+  /**
+   * Calcula la tarifa final aplicada a un registro.
+   * Para RECARGUE multiplica el valor base por la cantidad de recargues.
+   * Descuenta el monto de rechazo si aplica.
+   */
+  export function calcularTarifa(
+    tipoOperacion: Models.TipoOperacion,
+    tipoZona: Models.TipoZona,
+    cantidadRecargues: number,
+    tieneRechazos: boolean
+  ): number {
+    const valorBase = getValorVigente(tipoOperacion, tipoZona);
+    const total = tipoOperacion === Models.TipoOperacion.RECARGUE
+      ? valorBase * cantidadRecargues
+      : valorBase;
+    const descuento = tieneRechazos ? Environment.getMontoRechazo() : 0;
+    return NumberUtils.round2(total - descuento);
+  }
+
+  /** Retorna todas las tarifas activas. */
   export function getTarifasActivas(): Models.Tarifa[] {
     return TarifasRepository.findAllActive();
   }
@@ -28,20 +47,20 @@ namespace TarifaService {
   }
 
   /**
-   * Crea una nueva tarifa para un tipo de ruta.
-   * Desactiva automáticamente la tarifa anterior del mismo tipo.
+   * Crea una nueva tarifa para un tipo de operación y zona.
+   * Desactiva automáticamente la tarifa anterior del mismo tipo+zona.
    */
   export function crear(dto: DTO.CreateTarifaDTO, session: Auth.UserSession): Models.Tarifa {
     RoleGuard.requirePermission(session, Auth.Permission.CREAR_TARIFA);
 
-    const anterior = TarifasRepository.findVigente(dto.tipoRuta);
+    const anterior = TarifasRepository.findVigente(dto.tipoOperacion, dto.tipoZona);
 
-    // Desactivar tarifa anterior
-    TarifasRepository.deactivateByTipoRuta(dto.tipoRuta);
+    TarifasRepository.deactivateByTipo(dto.tipoOperacion, dto.tipoZona);
 
     const nueva: Models.Tarifa = {
       tarifaId: IdGenerator.uuid(),
-      tipoRuta: dto.tipoRuta,
+      tipoOperacion: dto.tipoOperacion,
+      tipoZona: dto.tipoZona,
       valor: NumberUtils.round2(dto.valor),
       descripcion: dto.descripcion,
       fechaVigencia: dto.fechaVigencia
@@ -64,7 +83,7 @@ namespace TarifaService {
       valorNuevo: nueva,
     });
 
-    AppLogger.info('TarifaService', `Tarifa creada: ${dto.tipoRuta} → $${dto.valor}`);
+    AppLogger.info('TarifaService', `Tarifa creada: ${dto.tipoOperacion}/${dto.tipoZona} → $${dto.valor}`);
     return nueva;
   }
 }

@@ -66,8 +66,13 @@ namespace RegistroService {
       throw new Error(`Camión ${dto.camionId} no encontrado o inactivo.`);
     }
 
-    // Snapshot de la tarifa vigente
-    const tarifaAplicada = TarifaService.getValorVigente(dto.tipoRuta);
+    // Snapshot de la tarifa vigente (con cálculo completo)
+    const cantidadRecargues = dto.tipoOperacion === Models.TipoOperacion.RECARGUE
+      ? (dto.cantidadRecargues ?? 1)
+      : 1;
+    const tarifaAplicada = TarifaService.calcularTarifa(
+      dto.tipoOperacion, dto.tipoZona, cantidadRecargues, dto.tieneRechazos
+    );
 
     const ahora = new Date();
     const registro: Models.Registro = {
@@ -75,7 +80,14 @@ namespace RegistroService {
       fecha: DateUtils.parseISODate(dto.fecha),
       choferId: dto.choferId,
       camionId: dto.camionId,
-      tipoRuta: dto.tipoRuta,
+      placa: dto.placa,
+      transporte: dto.transporte,
+      ruta: dto.ruta,
+      tipoOperacion: dto.tipoOperacion,
+      tipoZona: dto.tipoZona,
+      cantidadRecargues,
+      kilometraje: dto.kilometraje,
+      tieneRechazos: dto.tieneRechazos,
       tarifaAplicada,
       observaciones: dto.observaciones ?? '',
       origen: dto.origen ?? Models.OrigenRegistro.MANUAL,
@@ -130,16 +142,29 @@ namespace RegistroService {
     const anterior = RegistrosRepository.findById(registroId);
     if (!anterior) throw new Error(`Registro ${registroId} no encontrado.`);
 
-    // Si cambia el tipo de ruta, recalcular tarifa
-    let tarifaAplicada = anterior.tarifaAplicada;
-    if (dto.tipoRuta && dto.tipoRuta !== anterior.tipoRuta) {
-      tarifaAplicada = TarifaService.getValorVigente(dto.tipoRuta);
-    }
+    // Si cambia algo que afecta la tarifa, recalcular
+    const tipoOperacion = dto.tipoOperacion ?? anterior.tipoOperacion;
+    const tipoZona = dto.tipoZona ?? anterior.tipoZona;
+    const cantidadRecargues = tipoOperacion === Models.TipoOperacion.RECARGUE
+      ? (dto.cantidadRecargues ?? anterior.cantidadRecargues)
+      : 1;
+    const tieneRechazos = dto.tieneRechazos !== undefined ? dto.tieneRechazos : anterior.tieneRechazos;
+
+    const recalcular = dto.tipoOperacion || dto.tipoZona || dto.cantidadRecargues !== undefined || dto.tieneRechazos !== undefined;
+    const tarifaAplicada = recalcular
+      ? TarifaService.calcularTarifa(tipoOperacion, tipoZona, cantidadRecargues, tieneRechazos)
+      : anterior.tarifaAplicada;
 
     const actualizado: Models.Registro = {
       ...anterior,
       fecha: dto.fecha ? DateUtils.parseISODate(dto.fecha) : anterior.fecha,
-      tipoRuta: dto.tipoRuta ?? anterior.tipoRuta,
+      transporte: dto.transporte ?? anterior.transporte,
+      ruta: dto.ruta ?? anterior.ruta,
+      tipoOperacion,
+      tipoZona,
+      cantidadRecargues,
+      kilometraje: dto.kilometraje !== undefined ? dto.kilometraje : anterior.kilometraje,
+      tieneRechazos,
       tarifaAplicada,
       observaciones: dto.observaciones ?? anterior.observaciones,
     };
@@ -228,9 +253,8 @@ namespace RegistroService {
       choferId,
       camionId,
       totalRegistros: activos.length,
-      totalUrbanas: activos.filter(r => r.tipoRuta === Models.TipoRuta.URBANA).length,
-      totalRurales: activos.filter(r => r.tipoRuta === Models.TipoRuta.RURAL).length,
-      totalEspeciales: 0,
+      totalEntregas: activos.filter(r => r.tipoOperacion === Models.TipoOperacion.ENTREGA).length,
+      totalRecargues: activos.filter(r => r.tipoOperacion === Models.TipoOperacion.RECARGUE).length,
       montoTotal: NumberUtils.round2(activos.reduce((sum, r) => sum + r.tarifaAplicada, 0)),
       fechaCalculo: new Date(),
       recalculado: existente !== null,

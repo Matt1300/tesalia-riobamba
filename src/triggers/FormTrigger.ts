@@ -9,8 +9,8 @@ namespace FormTrigger {
    * El evento contiene las respuestas del formulario.
    */
   export function handle(e: GoogleAppsScript.Events.SheetsOnFormSubmit): void {
-    // Capturar el email antes del try para poder notificar al chofer si falla
-    const emailChofer = e.values[1]?.trim() ?? '';
+    // Capturar la placa antes del try para poder identificar el chofer si falla
+    const placa = e.values[3]?.trim().toUpperCase() ?? '';
 
     try {
       AppLogger.info('FormTrigger', 'Nueva respuesta de formulario recibida');
@@ -25,9 +25,8 @@ namespace FormTrigger {
       AppLogger.error('FormTrigger', 'Error al procesar respuesta del form', err);
       const msg = err instanceof Error ? err.message : String(err);
       _marcarEstado(e, 'ERROR', msg);
-      _guardarError(e, emailChofer, msg);
+      _guardarError(e, placa, msg);
       _notificarAdmin_Error(err);
-      _notificarChofer_Error(emailChofer, err);
     }
   }
 
@@ -74,16 +73,16 @@ namespace FormTrigger {
 
   function _guardarError(
     e: GoogleAppsScript.Events.SheetsOnFormSubmit,
-    emailChofer: string,
+    placa: string,
     mensajeError: string
   ): void {
     try {
-      const usuario = emailChofer ? UsuariosRepository.findByEmail(emailChofer) : null;
+      const camion = placa ? CamionesRepository.findByPatente(placa) : null;
       const formError: Models.FormError = {
         errorId: IdGenerator.uuid(),
         timestamp: new Date(),
-        emailChofer,
-        choferId: usuario?.choferId ?? null,
+        emailChofer: placa, // guardamos la placa en este campo para referencia
+        choferId: camion?.choferId ?? null,
         rawValues: JSON.stringify(e.values),
         mensajeError,
         estado: Models.EstadoFormError.PENDIENTE,
@@ -107,19 +106,26 @@ namespace FormTrigger {
 
     MailApp.sendEmail({
       to: emailAdmin,
-      subject: `[Tesalia] Nuevo registro: ${nombreChofer} — ${dto.tipoRuta} — ${fechaStr}`,
+      subject: `[Tesalia] Nuevo registro: ${nombreChofer} — ${dto.tipoOperacion}/${dto.tipoZona} — ${fechaStr}`,
       body: [
         `Se recibió un nuevo registro de ruta vía formulario.`,
         ``,
-        `Chofer:         ${nombreChofer}`,
-        `Fecha:          ${fechaStr}`,
-        `Tipo de ruta:   ${dto.tipoRuta}`,
-        `Tarifa aplicada: $${registro.tarifaAplicada.toFixed(2)}`,
-        `Estado:         PENDIENTE (requiere validación)`,
-        dto.observaciones ? `Observaciones:  ${dto.observaciones}` : '',
+        `Chofer:           ${nombreChofer}`,
+        `Placa:            ${dto.placa}`,
+        `Transporte:       ${dto.transporte}`,
+        `Ruta:             ${dto.ruta}`,
+        `Fecha:            ${fechaStr}`,
+        `Tipo operación:   ${dto.tipoOperacion}`,
+        `Tipo zona:        ${dto.tipoZona}`,
+        dto.tipoOperacion === Models.TipoOperacion.RECARGUE ? `Cantidad:         ${dto.cantidadRecargues}` : '',
+        `Kilometraje:      ${dto.kilometraje} km`,
+        `Rechazos:         ${dto.tieneRechazos ? 'Sí' : 'No'}`,
+        `Tarifa aplicada:  $${registro.tarifaAplicada.toFixed(2)}`,
+        `Estado:           PENDIENTE (requiere validación)`,
+        dto.observaciones ? `Observaciones:    ${dto.observaciones}` : '',
         ``,
         `Ingresa al sistema para validarlo.`,
-      ].filter(line => line !== undefined && line !== null).join('\n'),
+      ].filter(Boolean).join('\n'),
     });
   }
 
@@ -135,147 +141,96 @@ namespace FormTrigger {
     });
   }
 
-  /**
-   * Notifica al chofer que su envío falló, con el motivo y datos de ayuda.
-   * El chofer puede así corregir y re-enviar el formulario.
-   */
-  function _notificarChofer_Error(emailChofer: string, err: unknown): void {
-    if (!emailChofer) return;
-
-    const msg = err instanceof Error ? err.message : String(err);
-
-    // Intentar obtener las placas asignadas al chofer para ayudarlo a re-enviar
-    let ayudaPlacas = '';
-    try {
-      const usuario = UsuariosRepository.findByEmail(emailChofer);
-      if (usuario?.choferId) {
-        const camiones = CamionesRepository.findByChoferId(usuario.choferId)
-          .filter(c => c.activo);
-        if (camiones.length > 0) {
-          ayudaPlacas = '\n\nTus camiones asignados:\n' +
-            camiones.map(c => `  - ${c.patente}${c.modelo ? ' (' + c.modelo + ')' : ''}`).join('\n');
-        }
-      }
-    } catch (_) {
-      // Si no se puede obtener los camiones, no bloquear la notificación
-    }
-
-    MailApp.sendEmail({
-      to: emailChofer,
-      subject: `[Tesalia] Tu registro de ruta no pudo ser procesado`,
-      body: [
-        `Hola,`,
-        ``,
-        `Tu respuesta del formulario fue recibida, pero no pudo ser procesada por el siguiente motivo:`,
-        ``,
-        `  ${msg}`,
-        ayudaPlacas,
-        ``,
-        `Por favor vuelve a llenar el formulario con los datos correctos.`,
-        `Si crees que es un error del sistema, comunícate con el administrador.`,
-        ``,
-        `Sistema Tesalia Riobamba`,
-      ].filter(l => l !== undefined && l !== null).join('\n'),
-    });
-  }
 
   /**
    * Convierte el evento del form a un DTO.
    * Los índices de los campos dependen del orden de preguntas en el Form.
    *
-   * Orden esperado del Form:
+   * Orden esperado del Form (con secciones condicionales):
    *   0: Timestamp (automático de Sheets)
-   *   1: Email (captura automática)
-   *   2: Fecha del recorrido
-   *   3: Placa del camión (opcional si el chofer tiene un único camión activo)
-   *   4: Tipo de ruta
-   *   5: Observaciones
+   *   1: Transporte (número)
+   *   2: Ruta (número)
+   *   3: Placa (ej: RBH-1239)
+   *   4: Tipo de operación (Entrega / Recargue)
+   *   5: Cantidad de recargues (1-5, vacío si es Entrega — sección 2 condicional)
+   *   6: Tipo de zona (Urbano / Foráneo / Extraforáneo — sección 3)
+   *   7: Kilometraje (número)
+   *   8: ¿Tuvo rechazos? (Sí / No)
+   *   9: Observaciones (opcional)
    */
   function parseFormResponse(e: GoogleAppsScript.Events.SheetsOnFormSubmit): DTO.CreateRegistroDTO {
     const values = e.values;
+    AppLogger.info('FormTrigger', `Raw values (${values.length}): ${JSON.stringify(values)}`);
 
-    const emailChofer   = values[1]?.trim() ?? '';
-    const fechaRaw      = values[2]?.trim() ?? '';
-    const patente       = values[3]?.trim().toUpperCase() ?? '';
-    const tipoRutaRaw   = values[4]?.trim().toUpperCase() ?? '';
-    const observaciones = values[5]?.trim() ?? '';
+    const transporte     = values[1]?.trim() ?? '';
+    const ruta           = values[2]?.trim() ?? '';
+    const placa          = values[3]?.trim().toUpperCase() ?? '';
+    const operacionRaw   = values[4]?.trim().toUpperCase() ?? '';
+    const cantidadRaw    = values[5]?.trim() ?? '';
+    const zonaRaw        = values[6]?.trim().toUpperCase() ?? '';
+    const kilometrajeRaw = values[7]?.trim() ?? '';
+    const rechazosRaw    = values[8]?.trim().toUpperCase() ?? '';
+    const observaciones  = values[9]?.trim() ?? '';
 
-    // Resolver chofer por email del respondente
-    const usuario = UsuariosRepository.findByEmail(emailChofer);
-    if (!usuario || !usuario.choferId) {
-      throw new Error(
-        `No se encontró un chofer asociado al email "${emailChofer}". ` +
-        `Verifique que el usuario esté registrado con rol CHOFER.`
-      );
+    if (!placa) throw new Error('La placa es requerida.');
+
+    // Resolver camión y chofer por placa
+    const camion = CamionesRepository.findByPatente(placa);
+    if (!camion || !camion.activo) {
+      throw new Error(`No se encontró un camión activo con placa "${placa}".`);
     }
 
-    const camion = _resolverCamion(patente, usuario.choferId);
-    const tipoRuta = normalizarTipoRuta(tipoRutaRaw);
-    const fecha = normalizarFecha(fechaRaw);
+    const tipoOperacion = normalizarTipoOperacion(operacionRaw);
+    const tipoZona = normalizarTipoZona(zonaRaw);
+    const cantidadRecargues = tipoOperacion === Models.TipoOperacion.RECARGUE
+      ? (parseInt(cantidadRaw) || 1)
+      : 1;
+    const kilometraje = parseFloat(kilometrajeRaw) || 0;
+    const tieneRechazos = rechazosRaw === 'SÍ' || rechazosRaw === 'SI' || rechazosRaw === 'S';
+    const fecha = normalizarFecha(values[0]?.trim() ?? '');
     const responseId = `form_${e.namedValues['Timestamp']?.[0] ?? Date.now()}`;
 
     return {
       fecha,
-      choferId: usuario.choferId,
+      choferId: camion.choferId,
       camionId: camion.camionId,
-      tipoRuta,
+      placa,
+      transporte,
+      ruta,
+      tipoOperacion,
+      tipoZona,
+      cantidadRecargues,
+      kilometraje,
+      tieneRechazos,
       observaciones,
       origen: Models.OrigenRegistro.FORM,
       formResponseId: responseId,
     };
   }
 
-  /**
-   * Resuelve el camión a partir de la placa ingresada o auto-detecta si el
-   * chofer tiene exactamente un camión activo y no ingresó placa.
-   *
-   * Siempre valida que el camión resuelto pertenezca al chofer que envió
-   * el formulario, evitando registros con datos de otro chofer.
-   */
-  function _resolverCamion(patente: string, choferId: string): Models.Camion {
-    if (patente) {
-      const camion = CamionesRepository.findByPatente(patente);
-      if (!camion || !camion.activo) {
-        throw new Error(`No se encontró un camión activo con placa "${patente}".`);
-      }
-      if (camion.choferId !== choferId) {
-        throw new Error(
-          `La placa "${patente}" no está asignada a tu perfil. ` +
-          `Verifica la placa o contacta al administrador.`
-        );
-      }
-      return camion;
-    }
-
-    // Sin placa: auto-resolver por los camiones activos del chofer
-    const misCamiones = CamionesRepository.findByChoferId(choferId).filter(c => c.activo);
-    if (misCamiones.length === 0) {
-      throw new Error(
-        'No tienes camiones activos asignados. Contacta al administrador.'
-      );
-    }
-    if (misCamiones.length > 1) {
-      const placas = misCamiones.map(c => c.patente).join(', ');
-      throw new Error(
-        `Tienes ${misCamiones.length} camiones asignados (${placas}). ` +
-        `Debes especificar la placa en el formulario.`
-      );
-    }
-    // Exactamente un camión activo → se usa automáticamente
-    return misCamiones[0];
-  }
-
-  function normalizarTipoRuta(raw: string): Models.TipoRuta {
-    const mapa: Record<string, Models.TipoRuta> = {
-      'URBANA': Models.TipoRuta.URBANA,
-      'RURAL': Models.TipoRuta.RURAL,
+  function normalizarTipoOperacion(raw: string): Models.TipoOperacion {
+    const mapa: Record<string, Models.TipoOperacion> = {
+      'ENTREGA': Models.TipoOperacion.ENTREGA,
+      'RECARGUE': Models.TipoOperacion.RECARGUE,
     };
-
     const normalizado = mapa[raw];
     if (!normalizado) {
-      throw new Error(
-        `Tipo de ruta "${raw}" no reconocido. Valores válidos: ${Object.keys(mapa).join(', ')}`
-      );
+      throw new Error(`Tipo de operación "${raw}" no reconocido. Valores válidos: ENTREGA, RECARGUE`);
+    }
+    return normalizado;
+  }
+
+  function normalizarTipoZona(raw: string): Models.TipoZona {
+    const mapa: Record<string, Models.TipoZona> = {
+      'URBANO': Models.TipoZona.URBANO,
+      'FORANEO': Models.TipoZona.FORANEO,
+      'FORÁNEO': Models.TipoZona.FORANEO,
+      'EXTRAFORANEO': Models.TipoZona.EXTRAFORANEO,
+      'EXTRAFORÁNEO': Models.TipoZona.EXTRAFORANEO,
+    };
+    const normalizado = mapa[raw];
+    if (!normalizado) {
+      throw new Error(`Tipo de zona "${raw}" no reconocido. Valores válidos: URBANO, FORANEO, EXTRAFORANEO`);
     }
     return normalizado;
   }

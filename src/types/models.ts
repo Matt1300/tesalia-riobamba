@@ -8,9 +8,15 @@ namespace Models {
     CHOFER = 'CHOFER',
   }
 
-  export enum TipoRuta {
-    URBANA = 'URBANA',
-    RURAL = 'RURAL',
+  export enum TipoOperacion {
+    ENTREGA = 'ENTREGA',
+    RECARGUE = 'RECARGUE',
+  }
+
+  export enum TipoZona {
+    URBANO = 'URBANO',
+    FORANEO = 'FORANEO',
+    EXTRAFORANEO = 'EXTRAFORANEO',
   }
 
   export enum OrigenRegistro {
@@ -79,7 +85,8 @@ namespace Models {
 
   export interface Tarifa {
     tarifaId: string;
-    tipoRuta: TipoRuta;
+    tipoOperacion: TipoOperacion;
+    tipoZona: TipoZona;
     valor: number;
     descripcion: string;
     fechaVigencia: Date;
@@ -94,7 +101,14 @@ namespace Models {
     fecha: Date;
     choferId: string;
     camionId: string;
-    tipoRuta: TipoRuta;
+    placa: string;
+    transporte: string;
+    ruta: string;
+    tipoOperacion: TipoOperacion;
+    tipoZona: TipoZona;
+    cantidadRecargues: number;
+    kilometraje: number;
+    tieneRechazos: boolean;
     tarifaAplicada: number;
     observaciones: string;
     origen: OrigenRegistro;
@@ -113,9 +127,8 @@ namespace Models {
     choferId: string;
     camionId: string;
     totalRegistros: number;
-    totalUrbanas: number;
-    totalRurales: number;
-    totalEspeciales: number;
+    totalEntregas: number;
+    totalRecargues: number;
     montoTotal: number;
     fechaCalculo: Date;
     recalculado: boolean;

@@ -36,7 +36,9 @@ namespace Setup {
     }
 
     AppLogger.info('Setup', 'Configuración completada. El sistema está listo.');
-    SpreadsheetApp.getUi().alert('✅ Sistema inicializado correctamente.\n\nTodas las hojas han sido creadas.');
+    try {
+      SpreadsheetApp.getUi().alert('✅ Sistema inicializado correctamente.\n\nTodas las hojas han sido creadas.');
+    } catch (_) { /* Sin UI disponible al ejecutar desde el editor */ }
   }
 
   function crearHoja(
@@ -105,66 +107,127 @@ namespace Setup {
    */
   export function crearFormulario(): void {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const appNombre = Environment.getAppNombre();
 
-    // Verificar si ya existe
+    // Si ya existe un form en config, editarlo en lugar de crear uno nuevo.
+    let form: GoogleAppsScript.Forms.Form;
     const existingId = Environment.getFormId();
     if (existingId) {
       try {
-        const existing = FormApp.openById(existingId);
-        const msg = `El formulario ya existe.\n\nURL para choferes:\n${existing.getPublishedUrl()}`;
-        AppLogger.info('Setup', msg);
-        SpreadsheetApp.getUi().alert(msg);
-        return;
+        form = FormApp.openById(existingId);
+        // Limpiar todas las preguntas existentes para reconstruirlas
+        form.getItems().slice().reverse().forEach(item => form.deleteItem(item));
+        AppLogger.info('Setup', `Actualizando formulario existente: ${existingId}`);
       } catch (_) {
-        AppLogger.warn('Setup', 'Form ID en config no encontrado. Creando uno nuevo...');
+        AppLogger.warn('Setup', 'Form ID en config no accesible. Creando uno nuevo...');
+        form = FormApp.create(`${appNombre} — Registro de Ruta`);
+        form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+        _setConfigValue(ss, Constants.CONFIG_KEYS.FORM_ID, form.getId());
+        Environment.clearCache();
       }
+    } else {
+      form = FormApp.create(`${appNombre} — Registro de Ruta`);
+      form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+      _setConfigValue(ss, Constants.CONFIG_KEYS.FORM_ID, form.getId());
+      Environment.clearCache();
     }
 
-    const appNombre = Environment.getAppNombre();
-    const form = FormApp.create(`${appNombre} — Registro de Ruta`);
-
     form.setDescription('Formulario para que los choferes registren sus rutas diarias.');
-    form.setCollectEmail(true);
+    form.setCollectEmail(false);
     form.setShowLinkToRespondAgain(true);
     form.setConfirmationMessage('¡Registro enviado correctamente! Será revisado por el administrador.');
 
-    // Pregunta 1: Fecha del recorrido
-    form.addDateItem()
-      .setTitle('Fecha del recorrido')
-      .setRequired(true);
+    const validacionNum = FormApp.createTextValidation()
+      .requireNumberGreaterThan(0)
+      .build();
 
-    // Pregunta 2: Placa del camión
+    // ── Sección 1: Datos de identificación ───────────────────────────────────
+    // (la sección 1 existe por defecto al crear el form)
+
     (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
-      .setTitle('Placa del camión')
+      .setTitle('Transporte')
       .setRequired(true)
-      .setHelpText('Ingrese la placa en mayúsculas. Ej: ABC-1234');
+      .setValidation(validacionNum)
+      .setHelpText('Número de transporte');
 
-    // Pregunta 3: Tipo de ruta
+    (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
+      .setTitle('Ruta')
+      .setRequired(true)
+      .setValidation(validacionNum)
+      .setHelpText('Número de ruta');
+
+    (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
+      .setTitle('Placa')
+      .setRequired(true)
+      .setHelpText('Ingrese la placa. Ej: RBH-1239');
+
+    // ── Sección 2 (condicional): Solo para Recargue ───────────────────────────
+    const seccionRecargue = form.addPageBreakItem()
+      .setTitle('Recargue — Cantidad');
+
     form.addMultipleChoiceItem()
-      .setTitle('Tipo de ruta')
-      .setChoiceValues(['URBANA', 'RURAL'])
+      .setTitle('Cantidad de recargues')
+      .setChoiceValues(['1', '2', '3', '4', '5'])
       .setRequired(true);
 
-    // Pregunta 4: Observaciones (opcional)
+    // ── Sección 3: Datos del recorrido ────────────────────────────────────────
+    const seccionResto = form.addPageBreakItem()
+      .setTitle('Datos del recorrido');
+
+    form.addMultipleChoiceItem()
+      .setTitle('Tipo de zona')
+      .setChoiceValues(['Urbano', 'Foráneo', 'Extraforáneo'])
+      .setRequired(true);
+
+    (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
+      .setTitle('Kilometraje')
+      .setRequired(true)
+      .setValidation(validacionNum)
+      .setHelpText('Km recorridos en el día');
+
+    form.addMultipleChoiceItem()
+      .setTitle('¿Tuvo rechazos en el día?')
+      .setChoiceValues(['Sí', 'No'])
+      .setRequired(true);
+
     form.addParagraphTextItem()
       .setTitle('Observaciones')
       .setRequired(false)
       .setHelpText('Opcional: novedades del recorrido');
 
-    // Vincular al Spreadsheet actual (crea hoja "Form Responses 1")
-    form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+    // ── Navegación condicional desde Sección 1 ────────────────────────────────
+    // Insertar "Tipo de operación" en sección 1 (antes de los page breaks).
+    // Lo creamos al final y lo movemos a la posición correcta (índice 3, tras Placa).
+    const itemTipoOp = form.addMultipleChoiceItem();
+    itemTipoOp
+      .setTitle('Tipo de operación')
+      .setRequired(true)
+      .setChoices([
+        itemTipoOp.createChoice('Entrega',  seccionResto),
+        itemTipoOp.createChoice('Recargue', seccionRecargue),
+      ]);
 
-    // Guardar el ID en Configuracion
-    _setConfigValue(ss, Constants.CONFIG_KEYS.FORM_ID, form.getId());
-    Environment.clearCache();
+    // Mover "Tipo de operación" a posición 3 (justo después de Placa).
+    // Buscamos por título para no depender de que sea el último item.
+    const allItems = form.getItems();
+    const tipoOpIdx = allItems.map(i => i.getTitle()).indexOf('Tipo de operación');
+    if (tipoOpIdx > 3) {
+      form.moveItem(tipoOpIdx, 3);
+    }
+    AppLogger.info('Setup', `Items del form tras moveItem: ${form.getItems().map((i, idx) => idx + ':' + i.getTitle()).join(', ')}`);
+
+    // Al final de la sección 2 redirigir a sección 3 (no al siguiente por defecto)
+    seccionRecargue.setGoToPage(seccionResto);
 
     const url = form.getPublishedUrl();
     AppLogger.info('Setup', `Formulario creado: ${url}`);
-    SpreadsheetApp.getUi().alert(
-      `✅ Formulario creado exitosamente.\n\n` +
-      `URL para compartir con los choferes:\n${url}\n\n` +
-      `Próximo paso: ejecuta installTriggers() para activar el procesamiento automático.`
-    );
+    try {
+      SpreadsheetApp.getUi().alert(
+        `✅ Formulario creado exitosamente.\n\n` +
+        `URL para compartir con los choferes:\n${url}\n\n` +
+        `Próximo paso: ejecuta installTriggers() para activar el procesamiento automático.`
+      );
+    } catch (_) { /* Sin UI disponible al ejecutar desde el editor */ }
   }
 
   function _setConfigValue(
@@ -188,6 +251,76 @@ namespace Setup {
     sheet.appendRow([clave, valor, '', 'setup', new Date().toISOString()]);
   }
 
+  /**
+   * Migra las hojas existentes agregando columnas faltantes al final.
+   * NO elimina columnas ni toca datos existentes.
+   * Ejecutar cuando se agreguen nuevas columnas a Constants.HEADERS.
+   */
+  export function migrateSheets(): void {
+    AppLogger.info('Setup', 'Iniciando migración de hojas...');
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let totalAgregadas = 0;
+
+    const hojas: Array<{ nombre: string; cabeceras: readonly string[] }> = [
+      { nombre: Constants.SHEETS.USUARIOS,       cabeceras: Constants.HEADERS.USUARIOS },
+      { nombre: Constants.SHEETS.CHOFERES,       cabeceras: Constants.HEADERS.CHOFERES },
+      { nombre: Constants.SHEETS.CAMIONES,       cabeceras: Constants.HEADERS.CAMIONES },
+      { nombre: Constants.SHEETS.TARIFAS,        cabeceras: Constants.HEADERS.TARIFAS },
+      { nombre: Constants.SHEETS.REGISTROS,      cabeceras: Constants.HEADERS.REGISTROS },
+      { nombre: Constants.SHEETS.RESUMEN_MENSUAL,cabeceras: Constants.HEADERS.RESUMEN_MENSUAL },
+      { nombre: Constants.SHEETS.CONFIGURACION,  cabeceras: Constants.HEADERS.CONFIGURACION },
+      { nombre: Constants.SHEETS.AUDITORIA,      cabeceras: Constants.HEADERS.AUDITORIA },
+      { nombre: Constants.SHEETS.FORM_ERRORES,   cabeceras: Constants.HEADERS.FORM_ERRORES },
+    ];
+
+    for (const { nombre, cabeceras } of hojas) {
+      totalAgregadas += _migrarHoja(ss, nombre, cabeceras);
+    }
+
+    const msg = totalAgregadas === 0
+      ? 'Migración completada. No hubo cambios (todas las hojas ya tienen las columnas correctas).'
+      : `Migración completada. Se agregaron ${totalAgregadas} columna(s) nueva(s).`;
+
+    AppLogger.info('Setup', msg);
+    try { SpreadsheetApp.getUi().alert(`✅ ${msg}`); } catch (_) {}
+  }
+
+  function _migrarHoja(
+    ss: GoogleAppsScript.Spreadsheet.Spreadsheet,
+    nombre: string,
+    cabecerasEsperadas: readonly string[]
+  ): number {
+    const sheet = ss.getSheetByName(nombre);
+    if (!sheet) {
+      AppLogger.warn('Setup', `Hoja no encontrada, omitiendo: ${nombre}`);
+      return 0;
+    }
+
+    const lastCol = sheet.getLastColumn();
+    const cabecerasActuales: string[] = lastCol > 0
+      ? (sheet.getRange(1, 1, 1, lastCol).getValues()[0] as string[])
+      : [];
+
+    let agregadas = 0;
+    for (const cabecera of cabecerasEsperadas) {
+      if (!cabecerasActuales.includes(cabecera)) {
+        const newCol = cabecerasActuales.length + agregadas + 1;
+        const cell = sheet.getRange(1, newCol);
+        cell.setValue(cabecera);
+        cell.setBackground('#1a73e8').setFontColor('#ffffff').setFontWeight('bold').setFontSize(11);
+        agregadas++;
+        AppLogger.info('Setup', `  [${nombre}] Columna agregada: ${cabecera} (col ${newCol})`);
+      }
+    }
+
+    if (agregadas > 0) {
+      sheet.setFrozenRows(1);
+    }
+
+    return agregadas;
+  }
+
   function insertarTarifasIniciales(
     ss: GoogleAppsScript.Spreadsheet.Spreadsheet
   ): void {
@@ -196,17 +329,29 @@ namespace Setup {
 
     const ahora = new Date().toISOString();
 
-    const tarifas = [
-      [IdGenerator.uuid(), Models.TipoRuta.URBANA, 0, 'Ruta Urbana', ahora, '', true, 'system', ahora],
-      [IdGenerator.uuid(), Models.TipoRuta.RURAL, 0, 'Ruta Rural', ahora, '', true, 'system', ahora],
+    const tarifas: [string, string, number, string][] = [
+      [Models.TipoOperacion.ENTREGA,  Models.TipoZona.URBANO,       140, 'Entrega Urbano'],
+      [Models.TipoOperacion.ENTREGA,  Models.TipoZona.FORANEO,      148, 'Entrega Foráneo'],
+      [Models.TipoOperacion.ENTREGA,  Models.TipoZona.EXTRAFORANEO, 174, 'Entrega Extraforáneo'],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.URBANO,       105, 'Recargue Urbano (por recargue)'],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.FORANEO,      115, 'Recargue Foráneo (por recargue)'],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.EXTRAFORANEO, 150, 'Recargue Extraforáneo (por recargue)'],
     ];
 
-    tarifas.forEach(fila => sheet.appendRow(fila));
+    tarifas.forEach(([op, zona, valor, desc]) => {
+      sheet.appendRow([IdGenerator.uuid(), op, zona, valor, desc, ahora, '', true, 'system', ahora]);
+    });
 
-    AppLogger.warn(
-      'Setup',
-      'Tarifas iniciales creadas con valor $0. ' +
-      'Configure los valores reales desde la sección Administración > Tarifas.'
-    );
+    // Insertar monto de rechazo en Configuracion
+    const configSheet = ss.getSheetByName(Constants.SHEETS.CONFIGURACION);
+    if (configSheet) {
+      const data = configSheet.getDataRange().getValues();
+      const existe = data.some(row => String(row[0]) === Constants.CONFIG_KEYS.MONTO_RECHAZO);
+      if (!existe) {
+        configSheet.appendRow([Constants.CONFIG_KEYS.MONTO_RECHAZO, '5', 'Descuento por rechazos en el día ($)', 'system', ahora]);
+      }
+    }
+
+    AppLogger.info('Setup', 'Tarifas iniciales insertadas con valores reales.');
   }
 }

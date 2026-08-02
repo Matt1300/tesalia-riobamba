@@ -13,9 +13,8 @@ namespace ResumenMensualRepository {
       choferId: String(row[C.CHOFER_ID]),
       camionId: String(row[C.CAMION_ID]),
       totalRegistros: NumberUtils.fromSheetInt(row[C.TOTAL_REGISTROS]),
-      totalUrbanas: NumberUtils.fromSheetInt(row[C.TOTAL_URBANAS]),
-      totalRurales: NumberUtils.fromSheetInt(row[C.TOTAL_RURALES]),
-      totalEspeciales: NumberUtils.fromSheetInt(row[C.TOTAL_ESPECIALES]),
+      totalEntregas: NumberUtils.fromSheetInt(row[C.TOTAL_ENTREGAS]),
+      totalRecargues: NumberUtils.fromSheetInt(row[C.TOTAL_RECARGUES]),
       montoTotal: NumberUtils.fromSheetValue(row[C.MONTO_TOTAL]),
       fechaCalculo: DateUtils.fromSheetValue(row[C.FECHA_CALCULO]),
       recalculado: row[C.RECALCULADO] === true || row[C.RECALCULADO] === 'TRUE',
@@ -25,7 +24,7 @@ namespace ResumenMensualRepository {
   function resumenToRow(r: Models.ResumenMensual): unknown[] {
     return [
       r.resumenId, r.anio, r.mes, r.choferId, r.camionId,
-      r.totalRegistros, r.totalUrbanas, r.totalRurales, r.totalEspeciales,
+      r.totalRegistros, r.totalEntregas, r.totalRecargues,
       r.montoTotal, DateUtils.toISODate(r.fechaCalculo), r.recalculado,
     ];
   }

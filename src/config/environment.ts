@@ -53,4 +53,9 @@ namespace Environment {
   export function getEmailNotificaciones(): string {
     return get(Constants.CONFIG_KEYS.EMAIL_NOTIFICACIONES);
   }
+
+  export function getMontoRechazo(): number {
+    const valor = parseFloat(get(Constants.CONFIG_KEYS.MONTO_RECHAZO));
+    return isNaN(valor) ? 5 : valor;
+  }
 }
