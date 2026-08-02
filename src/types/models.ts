@@ -17,6 +17,7 @@ namespace Models {
     URBANO = 'URBANO',
     FORANEO = 'FORANEO',
     EXTRAFORANEO = 'EXTRAFORANEO',
+    FULL = 'FULL',
   }
 
   export enum OrigenRegistro {

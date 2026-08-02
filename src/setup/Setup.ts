@@ -167,7 +167,7 @@ namespace Setup {
 
     form.addMultipleChoiceItem()
       .setTitle('Cantidad de recargues')
-      .setChoiceValues(['1', '2', '3', '4', '5'])
+      .setChoiceValues(['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15'])
       .setRequired(true);
 
     // ── Sección 3: Datos del recorrido ────────────────────────────────────────
@@ -176,7 +176,7 @@ namespace Setup {
 
     form.addMultipleChoiceItem()
       .setTitle('Tipo de zona')
-      .setChoiceValues(['Urbano', 'Foráneo', 'Extraforáneo'])
+      .setChoiceValues(['Urbano', 'Foráneo', 'Extraforáneo', 'Full'])
       .setRequired(true);
 
     (form.addTextItem() as GoogleAppsScript.Forms.TextItem)
@@ -336,6 +336,7 @@ namespace Setup {
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.URBANO,       105, 'Recargue Urbano (por recargue)'],
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.FORANEO,      115, 'Recargue Foráneo (por recargue)'],
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.EXTRAFORANEO, 150, 'Recargue Extraforáneo (por recargue)'],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.FULL,         140, 'Recargue Full (por recargue)'],
     ];
 
     tarifas.forEach(([op, zona, valor, desc]) => {

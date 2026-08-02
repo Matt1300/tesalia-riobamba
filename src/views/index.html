@@ -1292,6 +1292,8 @@
             ? "background:#f3e5f5;color:#6a1b9a"
             : zona === "FORANEO"
             ? "background:#fff3e0;color:#e65100"
+            : zona === "FULL"
+            ? "background:#e8f5e9;color:#1b5e20"
             : "background:#fce8e6;color:#b71c1c";
           var cantidadTag = op === "RECARGUE" && cantidad > 1
             ? ' <span style="font-size:10px;background:#1565c0;color:#fff;border-radius:10px;padding:1px 5px">&times;' + cantidad + "</span>"
@@ -1766,7 +1768,7 @@
           var op = r ? r.tipoOperacion : "ENTREGA";
           var zona = r ? r.tipoZona : "URBANO";
           var cantidad = r ? (r.cantidadRecargues || 1) : 1;
-          var cantOpts = [1,2,3,4,5].map(function(n) {
+          var cantOpts = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(function(n) {
             return '<option value="' + n + '"' + (cantidad === n ? " selected" : "") + ">" + n + "</option>";
           }).join("");
 
@@ -1815,7 +1817,7 @@
             '<div class="form-group"><label class="form-label">Ruta *</label><input type="number" class="form-control" id="m-ruta" value="' + (r ? r.ruta || "" : "") + '" placeholder="N\u00famero" maxlength="10"></div>' +
             '</div><div class="form-row">' +
             '<div class="form-group"><label class="form-label">Tipo de operaci&#243;n *</label><select class="form-control" id="m-op"><option value="ENTREGA"' + (op === "ENTREGA" ? " selected" : "") + '>Entrega</option><option value="RECARGUE"' + (op === "RECARGUE" ? " selected" : "") + '>Recargue</option></select></div>' +
-            '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="m-zona"><option value="URBANO"' + (zona === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zona === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zona === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option></select></div>' +
+            '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="m-zona"><option value="URBANO"' + (zona === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zona === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zona === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option>' + (op === "RECARGUE" ? '<option value="FULL"' + (zona === "FULL" ? " selected" : "") + '>Full</option>' : '') + '</select></div>' +
             '</div><div class="form-row" id="m-recargues-row" style="' + (op === "RECARGUE" ? "" : "display:none") + '">' +
             '<div class="form-group"><label class="form-label">Cantidad de recargues *</label><select class="form-control" id="m-cantidad">' + cantOpts + '</select></div>' +
             '<div class="form-group"></div>' +
@@ -1877,11 +1879,22 @@
             },
           });
 
-          // Mostrar/ocultar cantidad de recargues según operación
+          // Mostrar/ocultar cantidad de recargues y opción FULL según operación
           var opSel = Modal._el.querySelector("#m-op");
           var cantRow = Modal._el.querySelector("#m-recargues-row");
+          var zonaSel = Modal._el.querySelector("#m-zona");
           opSel.addEventListener("change", function () {
-            cantRow.style.display = opSel.value === "RECARGUE" ? "" : "none";
+            var esRecargue = opSel.value === "RECARGUE";
+            cantRow.style.display = esRecargue ? "" : "none";
+            var fullOpt = zonaSel.querySelector('option[value="FULL"]');
+            if (esRecargue && !fullOpt) {
+              var opt = document.createElement("option");
+              opt.value = "FULL"; opt.textContent = "Full";
+              zonaSel.appendChild(opt);
+            } else if (!esRecargue && fullOpt) {
+              if (zonaSel.value === "FULL") zonaSel.value = "URBANO";
+              zonaSel.removeChild(fullOpt);
+            }
           });
 
           // Admin: al cambiar conductor, actualizar placas disponibles
@@ -1931,9 +1944,20 @@
 
           var opSel = Modal._el.querySelector("#m-op");
           var cantRow = Modal._el.querySelector("#m-recargues-row");
-          if (opSel && cantRow) {
+          var zonaSel = Modal._el.querySelector("#m-zona");
+          if (opSel && cantRow && zonaSel) {
             opSel.addEventListener("change", function () {
-              cantRow.style.display = opSel.value === "RECARGUE" ? "" : "none";
+              var esRecargue = opSel.value === "RECARGUE";
+              cantRow.style.display = esRecargue ? "" : "none";
+              var fullOpt = zonaSel.querySelector('option[value="FULL"]');
+              if (esRecargue && !fullOpt) {
+                var opt = document.createElement("option");
+                opt.value = "FULL"; opt.textContent = "Full";
+                zonaSel.appendChild(opt);
+              } else if (!esRecargue && fullOpt) {
+                if (zonaSel.value === "FULL") zonaSel.value = "URBANO";
+                zonaSel.removeChild(fullOpt);
+              }
             });
           }
         }
@@ -2400,7 +2424,7 @@
                     body:
                       '<div class="form-row">' +
                       '<div class="form-group"><label class="form-label">Tipo de operaci&#243;n *</label><select class="form-control" id="t-op"><option value="ENTREGA">Entrega</option><option value="RECARGUE">Recargue</option></select></div>' +
-                      '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="t-zona"><option value="URBANO">Urbano</option><option value="FORANEO">For&#225;neo</option><option value="EXTRAFORANEO">Extrafor&#225;neo</option></select></div>' +
+                      '<div class="form-group"><label class="form-label">Tipo de zona *</label><select class="form-control" id="t-zona"><option value="URBANO">Urbano</option><option value="FORANEO">For&#225;neo</option><option value="EXTRAFORANEO">Extrafor&#225;neo</option><option value="FULL">Full</option></select></div>' +
                       '</div><div class="form-row">' +
                       '<div class="form-group"><label class="form-label">Valor base ($) *</label><input type="number" class="form-control" id="t-valor" step="0.01" min="0" placeholder="0.00"></div>' +
                       '<div class="form-group"><label class="form-label">Vigencia desde</label><input type="date" class="form-control" id="t-vig" value="' + isoToday() + '"></div>' +
@@ -3272,7 +3296,7 @@
           // Resolver camión por placa
           var camionPre = placaRaw ? _camiones.filter(function(c) { return c.patente.toUpperCase() === placaRaw; })[0] : null;
           var chSel = UI.choferOptions(_choferes, camionPre ? camionPre.choferId : (err.choferId || ""));
-          var cantOpts = [1,2,3,4,5].map(function(n) {
+          var cantOpts = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15].map(function(n) {
             return '<option value="' + n + '"' + (cantidadRaw === n ? " selected" : "") + ">" + n + "</option>";
           }).join("");
 
@@ -3288,7 +3312,7 @@
               '<div class="form-group"><label class="form-label">Ruta *</label><input type="number" class="form-control" id="fe-ruta" value="' + rutaRaw + '"></div>' +
               '</div><div class="form-row">' +
               '<div class="form-group"><label class="form-label">Operaci&#243;n *</label><select class="form-control" id="fe-op"><option value="ENTREGA"' + (opRaw === "ENTREGA" ? " selected" : "") + '>Entrega</option><option value="RECARGUE"' + (opRaw === "RECARGUE" ? " selected" : "") + '>Recargue</option></select></div>' +
-              '<div class="form-group"><label class="form-label">Zona *</label><select class="form-control" id="fe-zona"><option value="URBANO"' + (zonaRaw === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zonaRaw === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zonaRaw === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option></select></div>' +
+              '<div class="form-group"><label class="form-label">Zona *</label><select class="form-control" id="fe-zona"><option value="URBANO"' + (zonaRaw === "URBANO" ? " selected" : "") + '>Urbano</option><option value="FORANEO"' + (zonaRaw === "FORANEO" ? " selected" : "") + '>For\u00e1neo</option><option value="EXTRAFORANEO"' + (zonaRaw === "EXTRAFORANEO" ? " selected" : "") + '>Extrafor\u00e1neo</option><option value="FULL"' + (zonaRaw === "FULL" ? " selected" : "") + '>Full</option></select></div>' +
               '</div><div class="form-row" id="fe-cant-row" style="' + (opRaw === "RECARGUE" ? "" : "display:none") + '">' +
               '<div class="form-group"><label class="form-label">Cantidad recargues</label><select class="form-control" id="fe-cantidad">' + cantOpts + '</select></div>' +
               '<div class="form-group"></div>' +

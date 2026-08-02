@@ -227,10 +227,11 @@ namespace FormTrigger {
       'FORÁNEO': Models.TipoZona.FORANEO,
       'EXTRAFORANEO': Models.TipoZona.EXTRAFORANEO,
       'EXTRAFORÁNEO': Models.TipoZona.EXTRAFORANEO,
+      'FULL': Models.TipoZona.FULL,
     };
     const normalizado = mapa[raw];
     if (!normalizado) {
-      throw new Error(`Tipo de zona "${raw}" no reconocido. Valores válidos: URBANO, FORANEO, EXTRAFORANEO`);
+      throw new Error(`Tipo de zona "${raw}" no reconocido. Valores válidos: URBANO, FORANEO, EXTRAFORANEO, FULL`);
     }
     return normalizado;
   }

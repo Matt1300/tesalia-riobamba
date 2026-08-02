@@ -65,6 +65,7 @@ namespace ReporteService {
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.URBANO],
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.FORANEO],
       [Models.TipoOperacion.RECARGUE, Models.TipoZona.EXTRAFORANEO],
+      [Models.TipoOperacion.RECARGUE, Models.TipoZona.FULL],
     ];
     const porOperacion: TotalPorOperacion[] = combos.map(([op, zona]) => ({
       tipoOperacion: op,
