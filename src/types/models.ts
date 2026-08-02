@@ -76,7 +76,7 @@ namespace Models {
     camionId: string;
     patente: string;
     modelo: string;
-    anio: number;
+    anio: number | null;
     choferId: string;
     activo: boolean;
     notas: string;

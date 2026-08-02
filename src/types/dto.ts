@@ -59,8 +59,8 @@ namespace DTO {
 
   export interface CreateCamionDTO {
     patente: string;
-    modelo: string;
-    anio: number;
+    modelo?: string;
+    anio?: number;
     choferId: string;
     notas?: string;
   }

@@ -33,8 +33,8 @@ namespace CamionService {
     const camion: Models.Camion = {
       camionId: IdGenerator.uuid(),
       patente: patenteNorm,
-      modelo: dto.modelo.trim(),
-      anio: dto.anio,
+      modelo: dto.modelo?.trim() ?? '',
+      anio: dto.anio ?? null,
       choferId: dto.choferId,
       activo: true,
       notas: dto.notas ?? '',
