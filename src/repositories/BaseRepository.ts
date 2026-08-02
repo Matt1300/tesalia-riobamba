@@ -55,6 +55,11 @@ namespace BaseRepository {
     sheet.getRange(sheetRow, activoColIndex + 1).setValue(false);
   }
 
+  export function deleteRow(sheetName: string, rowIndex: number): void {
+    const sheet = getSheet(sheetName);
+    sheet.deleteRow(rowIndex + 2);
+  }
+
   /**
    * Busca el índice de la fila (0-based) donde una columna tiene el valor dado.
    * Retorna -1 si no encuentra.

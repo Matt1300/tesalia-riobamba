@@ -24,8 +24,8 @@ namespace RegistroController {
             RegistroService.actualizar(p['id'] as string, p as unknown as DTO.UpdateRegistroDTO, session)
           );
 
-        case 'validar':
-          return API.ok(RegistroService.validar(p as unknown as DTO.ValidarRegistroDTO, session));
+        case 'marcarPagado':
+          return API.ok(RegistroService.marcarPagado(p as unknown as DTO.MarcarPagadoDTO, session));
 
         case 'eliminar':
           RegistroService.eliminar(p['id'] as string, session);

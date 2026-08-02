@@ -364,17 +364,13 @@
         font-size: 11px;
         font-weight: 600;
       }
-      .status-pendiente {
-        background: #fef3cd;
-        color: #856404;
+      .status-no-pagado {
+        background: #fff3e0;
+        color: #e65100;
       }
-      .status-validado {
+      .status-pagado {
         background: #e6f4ea;
         color: #1e7e34;
-      }
-      .status-rechazado {
-        background: #fce8e6;
-        color: #c62828;
       }
 
       /* Badge extras */
@@ -935,8 +931,8 @@
               Object.assign({ id: id }, dto),
             );
           },
-          validar: function (dto) {
-            return API.call("registros.validar", dto);
+          marcarPagado: function (id) {
+            return API.call("registros.marcarPagado", { registroId: id });
           },
           eliminar: function (id) {
             return API.call("registros.eliminar", { id: id });
@@ -1077,7 +1073,7 @@
           this._render();
         },
         _render: function () {
-          var path = window.location.hash.slice(1) || "dashboard";
+          var path = window.location.hash.slice(1) || "registros";
           var renderer = this.routes[path];
 
           // Reemplazar el elemento #content en cada navegación.
@@ -1247,15 +1243,22 @@
         },
         statusBadge: function (estado) {
           var map = {
-            PENDIENTE: "status-pendiente",
-            VALIDADO: "status-validado",
-            RECHAZADO: "status-rechazado",
+            NO_PAGADO: "status-no-pagado",
+            PAGADO: "status-pagado",
+            // backward compat con registros viejos
+            PENDIENTE: "status-no-pagado",
+            VALIDADO: "status-pagado",
+            RECHAZADO: "status-no-pagado",
+          };
+          var label = {
+            NO_PAGADO: "No pagado", PAGADO: "Pagado",
+            PENDIENTE: "No pagado", VALIDADO: "Pagado", RECHAZADO: "No pagado",
           };
           return (
             '<span class="status ' +
             (map[estado] || "") +
             '">' +
-            (estado || "-") +
+            (label[estado] || estado || "-") +
             "</span>"
           );
         },
@@ -1429,7 +1432,7 @@
                 return x.tipoOperacion === "RECARGUE";
               }).length;
               var pendientes = registros.filter(function (x) {
-                return x.estado === "PENDIENTE";
+                return x.estado === "NO_PAGADO";
               }).length;
               var actChoferes = _choferes.filter(function (c) {
                 return c.activo;
@@ -1452,7 +1455,7 @@
                 totalEntregas + "</div></div>" +
                 '<div class="stat-card accent-blue"><span class="stat-icon">&#9981;</span><div class="stat-label">Recargues</div><div class="stat-value" style="color:#1565c0">' +
                 totalRecargues + "</div></div>" +
-                '<div class="stat-card accent-orange"><span class="stat-icon">&#9200;</span><div class="stat-label">Pendientes</div><div class="stat-value" style="color:#f57c00">' +
+                '<div class="stat-card accent-orange"><span class="stat-icon">&#9200;</span><div class="stat-label">No pagados</div><div class="stat-value" style="color:#f57c00">' +
                 pendientes + "</div></div>";
 
               if (isAdmin && !filtro.choferId) {
@@ -1539,9 +1542,8 @@
                   choferFilterHtml +
                   '<select class="form-control" id="db-estado">' +
                   '<option value="">Todos los estados</option>' +
-                  '<option value="PENDIENTE">Pendiente</option>' +
-                  '<option value="VALIDADO">Validado</option>' +
-                  '<option value="RECHAZADO">Rechazado</option>' +
+                  '<option value="NO_PAGADO">No pagado</option>' +
+                  '<option value="PAGADO">Pagado</option>' +
                   "</select>" +
                   '<button class="btn btn-primary" id="db-filtrar">Actualizar</button>' +
                   "</div></div></div>" +
@@ -1581,10 +1583,13 @@
         var _choferes = [],
           _camiones = [],
           _data = [],
-          _filtro = {};
+          _filtro = {},
+          _pageSize = 40,
+          _page = 1;
 
         function _load(container, filtro) {
           _filtro = filtro || {};
+          _page = 1;
           UI.showLoading(container);
           Promise.all([API.choferes.getAll(), API.camiones.getAll()])
             .then(function (r) {
@@ -1599,6 +1604,59 @@
             .catch(function (e) {
               UI.showError(container, e.message);
             });
+        }
+
+        function _renderRows(container) {
+          // Ordenar por fecha DESC (más reciente primero)
+          var sorted = _data.slice().sort(function (a, b) {
+            return (b.fecha || "").localeCompare(a.fecha || "");
+          });
+          var visible = sorted.slice(0, _page * _pageSize);
+          var hayMas = visible.length < sorted.length;
+
+          var rows = visible.map(function (r) {
+            var canEdit = isAdmin || r.choferId === session.choferId;
+            var btns = "";
+            if (canEdit)
+              btns += '<button class="btn-icon" data-action="edit" data-id="' + r.registroId + '" title="Editar">&#9998;</button>';
+            if (isAdmin)
+              btns += '<button class="btn-icon" data-action="pagar" data-id="' + r.registroId + '" title="' + (r.estado === "PAGADO" ? "Marcar no pagado" : "Marcar pagado") + '" style="' + (r.estado === "PAGADO" ? "color:#1e7e34" : "color:#e65100") + '">&#36;</button>';
+            if (isAdmin)
+              btns += '<button class="btn-icon" data-action="delete" data-id="' + r.registroId + '" title="Eliminar">&#128465;</button>';
+            return (
+              "<tr>" +
+              '<td data-label="Fecha">' + UI.formatDate(r.fecha) + "</td>" +
+              '<td data-label="Chofer">' + UI.choferName(_choferes, r.choferId) + "</td>" +
+              '<td data-label="Operación">' + UI.operacionBadge(r.tipoOperacion, r.tipoZona, r.cantidadRecargues) + "</td>" +
+              '<td data-label="Placa">' + (r.placa || "-") + "</td>" +
+              '<td data-label="T/R">' + (r.transporte || "-") + " / " + (r.ruta || "-") + "</td>" +
+              '<td data-label="Km">' + (r.kilometraje ? r.kilometraje + " km" : "-") + "</td>" +
+              '<td data-label="Rechazos">' + (r.tieneRechazos ? '<span class="badge" style="background:#fce8e6;color:#b71c1c">Sí</span>' : '<span class="badge" style="background:#e8f5e9;color:#2e7d32">No</span>') + "</td>" +
+              '<td data-label="Monto">' + UI.formatCurrency(r.tarifaAplicada) + "</td>" +
+              '<td data-label="Pago">' + UI.statusBadge(r.estado) + "</td>" +
+              '<td data-label="Acciones"><div class="action-btns">' + btns + "</div></td>" +
+              "</tr>"
+            );
+          }).join("");
+
+          var tbody = container.querySelector("#reg-tbody");
+          var countEl = container.querySelector("#reg-count");
+          var moreBtn = container.querySelector("#btn-mas-reg");
+          if (tbody) tbody.innerHTML = sorted.length === 0
+            ? '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-muted)">&#128203; Sin registros para los filtros seleccionados</td></tr>'
+            : rows;
+          if (countEl) countEl.textContent = "Registros (" + _data.length + ")";
+          if (moreBtn) moreBtn.style.display = hayMas ? "" : "none";
+
+          container.querySelectorAll("[data-action]").forEach(function (btn) {
+            btn.onclick = function () {
+              var id = btn.dataset.id;
+              var r = _data.filter(function (x) { return x.registroId === id; })[0];
+              if (btn.dataset.action === "edit") _openEdit(container, r);
+              if (btn.dataset.action === "pagar") _marcarPagado(container, id);
+              if (btn.dataset.action === "delete") _confirmDelete(container, id);
+            };
+          });
         }
 
         function _renderPage(container) {
@@ -1619,35 +1677,6 @@
                 .join("")
             : "";
 
-          var rows = _data
-            .map(function (r) {
-              var canEdit = isAdmin || r.choferId === session.choferId;
-              var btns = "";
-              if (canEdit && r.estado === "PENDIENTE")
-                btns += '<button class="btn-icon" data-action="edit" data-id="' + r.registroId + '" title="Editar">&#9998;</button>';
-              if (isAdmin && r.estado === "PENDIENTE")
-                btns += '<button class="btn-icon" data-action="validar" data-id="' + r.registroId + '" title="Validar">&#10003;</button>';
-              if (isAdmin && r.estado === "PENDIENTE")
-                btns += '<button class="btn-icon" data-action="rechazar" data-id="' + r.registroId + '" title="Rechazar">&#10005;</button>';
-              if (isAdmin)
-                btns += '<button class="btn-icon" data-action="delete" data-id="' + r.registroId + '" title="Eliminar">&#128465;</button>';
-              return (
-                "<tr>" +
-                '<td data-label="Fecha">' + UI.formatDate(r.fecha) + "</td>" +
-                '<td data-label="Chofer">' + UI.choferName(_choferes, r.choferId) + "</td>" +
-                '<td data-label="Operación">' + UI.operacionBadge(r.tipoOperacion, r.tipoZona, r.cantidadRecargues) + "</td>" +
-                '<td data-label="Placa">' + (r.placa || "-") + "</td>" +
-                '<td data-label="T/R">' + (r.transporte || "-") + " / " + (r.ruta || "-") + "</td>" +
-                '<td data-label="Km">' + (r.kilometraje ? r.kilometraje + " km" : "-") + "</td>" +
-                '<td data-label="Rechazos">' + (r.tieneRechazos ? '<span class="badge" style="background:#fce8e6;color:#b71c1c">Sí</span>' : '<span class="badge" style="background:#e8f5e9;color:#2e7d32">No</span>') + "</td>" +
-                '<td data-label="Monto">' + UI.formatCurrency(r.tarifaAplicada) + "</td>" +
-                '<td data-label="Estado">' + UI.statusBadge(r.estado) + "</td>" +
-                '<td data-label="Acciones"><div class="action-btns">' + btns + "</div></td>" +
-                "</tr>"
-              );
-            })
-            .join("");
-
           var choferSelectHtml = isAdmin
             ? '<select class="form-control" id="f-chofer">' + choferOpts + "</select>"
             : "";
@@ -1660,22 +1689,19 @@
             choferSelectHtml +
             '<select class="form-control" id="f-estado">' +
             '<option value="">Todos los estados</option>' +
-            '<option value="PENDIENTE"' + (_filtro.estado === "PENDIENTE" ? " selected" : "") + ">Pendiente</option>" +
-            '<option value="VALIDADO"' + (_filtro.estado === "VALIDADO" ? " selected" : "") + ">Validado</option>" +
-            '<option value="RECHAZADO"' + (_filtro.estado === "RECHAZADO" ? " selected" : "") + ">Rechazado</option>" +
+            '<option value="NO_PAGADO"' + (_filtro.estado === "NO_PAGADO" ? " selected" : "") + ">No pagado</option>" +
+            '<option value="PAGADO"' + (_filtro.estado === "PAGADO" ? " selected" : "") + ">Pagado</option>" +
             "</select>" +
             '<div style="display:flex;gap:8px">' +
             '<button class="btn btn-primary" id="btn-filtrar" style="flex:1">Filtrar</button>' +
             '<button class="btn btn-secondary" id="btn-limpiar" style="flex:1">Limpiar</button>' +
             '</div></div></div></div>' +
             '<div class="card"><div class="toolbar" style="margin-bottom:12px">' +
-            '<div class="card-title" style="margin-bottom:0">Registros (' + _data.length + ")</div>" +
+            '<div class="card-title" style="margin-bottom:0" id="reg-count">Registros (' + _data.length + ")</div>" +
             '<button class="btn btn-primary" id="btn-nuevo-reg" style="white-space:nowrap">+ Nuevo</button>' +
             "</div>" +
-            (_data.length === 0
-              ? '<div class="empty-state"><div class="empty-state-icon">&#128203;</div><p>Sin registros para los filtros seleccionados</p></div>'
-              : '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Chofer</th><th>Operaci&#243;n</th><th>Placa</th><th>T/R</th><th>Km</th><th>Rechazos</th><th>Monto</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>' +
-                rows + "</tbody></table></div>") +
+            '<div class="table-wrapper"><table class="resp-table"><thead><tr><th>Fecha</th><th>Chofer</th><th>Operaci&#243;n</th><th>Placa</th><th>T/R</th><th>Km</th><th>Rechazos</th><th>Monto</th><th>Pago</th><th>Acciones</th></tr></thead><tbody id="reg-tbody"></tbody></table></div>' +
+            '<div style="text-align:center;margin-top:12px"><button class="btn btn-secondary" id="btn-mas-reg" style="display:none">Cargar m&#225;s</button></div>' +
             "</div>" +
             '<div class="fab-spacer"></div>' +
             '<button class="fab" id="fab-nuevo-reg" title="Nuevo Registro">+</button>';
@@ -1707,21 +1733,10 @@
           var fab = container.querySelector("#fab-nuevo-reg");
           if (fab) fab.onclick = function () { _openCreate(container); };
 
-          container.querySelectorAll("[data-action]").forEach(function (btn) {
-            btn.onclick = function () {
-              var id = btn.dataset.id;
-              var r = _data.filter(function (x) {
-                return x.registroId === id;
-              })[0];
-              if (btn.dataset.action === "edit") _openEdit(container, r);
-              if (btn.dataset.action === "validar")
-                _confirmValidar(container, id, "VALIDADO");
-              if (btn.dataset.action === "rechazar")
-                _confirmValidar(container, id, "RECHAZADO");
-              if (btn.dataset.action === "delete")
-                _confirmDelete(container, id);
-            };
-          });
+          var moreBtn = container.querySelector("#btn-mas-reg");
+          if (moreBtn) moreBtn.onclick = function () { _page++; _renderRows(container); };
+
+          _renderRows(container);
         }
 
         function _form(r, fixedChoferId) {
@@ -1901,27 +1916,20 @@
           }
         }
 
-        function _confirmValidar(container, id, estado) {
-          var label = estado === "VALIDADO" ? "Validar" : "Rechazar";
+        function _marcarPagado(container, id) {
+          var reg = _data.filter(function (x) { return x.registroId === id; })[0];
+          var esPagado = reg && reg.estado === "PAGADO";
           Modal.show({
-            title: label + " Registro",
-            danger: estado === "RECHAZADO",
-            saveLabel: label,
-            body:
-              "<p>&#191;Confirmar " +
-              label.toLowerCase() +
-              ' este registro?</p><div class="form-group" style="margin-top:12px"><label class="form-label">Motivo (opcional)</label><input type="text" class="form-control" id="m-motivo" placeholder="Motivo..."></div>',
+            title: esPagado ? "Revertir pago" : "Marcar como pagado",
+            saveLabel: esPagado ? "Revertir" : "Confirmar pago",
+            body: "<p>&#191;" + (esPagado ? "&#191;Revertir el pago de este registro?" : "Marcar este registro como pagado?") + "</p>",
             onSave: function () {
               Modal.setLoading(true);
               API.registros
-                .validar({
-                  registroId: id,
-                  estado: estado,
-                  motivo: Modal.val("m-motivo") || undefined,
-                })
+                .marcarPagado(id)
                 .then(function () {
                   Modal.hide();
-                  Toast.success("Registro " + estado.toLowerCase());
+                  Toast.success(esPagado ? "Revertido a no pagado" : "Registro marcado como pagado");
                   _load(container, _filtro);
                 })
                 .catch(function (e) {

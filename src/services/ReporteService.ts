@@ -34,8 +34,7 @@ namespace ReporteService {
   ): ResumenPeriodo {
     RoleGuard.requirePermission(session, Auth.Permission.VER_REPORTES_GLOBALES);
 
-    const registros = RegistrosRepository.findByFiltro(filtro)
-      .filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
+    const registros = RegistrosRepository.findByFiltro(filtro);
 
     const porChoferMap = new Map<string, TotalPorChofer>();
 
@@ -98,8 +97,7 @@ namespace ReporteService {
     const chofer = ChoferesRepository.findById(choferId);
     if (!chofer) throw new Error(`Chofer ${choferId} no encontrado.`);
 
-    const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId })
-      .filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
+    const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId });
 
     const periodo = filtro.anio && filtro.mes
       ? `${DateUtils.monthName(filtro.mes)} ${filtro.anio}`
@@ -153,8 +151,7 @@ namespace ReporteService {
     const chofer = ChoferesRepository.findById(choferId);
     if (!chofer) throw new Error(`Chofer ${choferId} no encontrado.`);
 
-    const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId })
-      .filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
+    const registros = RegistrosRepository.findByFiltro({ ...filtro, choferId });
 
     const periodo = filtro.anio && filtro.mes
       ? `${DateUtils.monthName(filtro.mes)} ${filtro.anio}`

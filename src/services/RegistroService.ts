@@ -92,7 +92,7 @@ namespace RegistroService {
       observaciones: dto.observaciones ?? '',
       origen: dto.origen ?? Models.OrigenRegistro.MANUAL,
       formResponseId: dto.formResponseId ?? null,
-      estado: Models.EstadoRegistro.PENDIENTE,
+      estado: Models.EstadoRegistro.NO_PAGADO,
       validadoPor: null,
       fechaValidacion: null,
       creadoEn: ahora,
@@ -184,15 +184,20 @@ namespace RegistroService {
     return actualizado;
   }
 
-  export function validar(dto: DTO.ValidarRegistroDTO, session: Auth.UserSession): Models.Registro {
-    RoleGuard.requirePermission(session, Auth.Permission.VALIDAR_REGISTRO);
+  /** Marca un registro como PAGADO. Solo el admin puede hacerlo. */
+  export function marcarPagado(dto: DTO.MarcarPagadoDTO, session: Auth.UserSession): Models.Registro {
+    RoleGuard.requirePermission(session, Auth.Permission.MARCAR_PAGADO);
 
     const registro = RegistrosRepository.findById(dto.registroId);
     if (!registro) throw new Error(`Registro ${dto.registroId} no encontrado.`);
 
+    const nuevoEstado = registro.estado === Models.EstadoRegistro.PAGADO
+      ? Models.EstadoRegistro.NO_PAGADO
+      : Models.EstadoRegistro.PAGADO;
+
     const actualizado: Models.Registro = {
       ...registro,
-      estado: dto.estado,
+      estado: nuevoEstado,
       validadoPor: session.email,
       fechaValidacion: new Date(),
     };
@@ -200,13 +205,11 @@ namespace RegistroService {
     RegistrosRepository.update(actualizado);
     AuditoriaService.log({
       session,
-      accion: dto.estado === Models.EstadoRegistro.VALIDADO
-        ? Models.AccionAuditoria.VALIDAR
-        : Models.AccionAuditoria.RECHAZAR,
+      accion: Models.AccionAuditoria.MARCAR_PAGADO,
       entidad: Constants.SHEETS.REGISTROS,
       entidadId: dto.registroId,
       valorAnterior: { estado: registro.estado },
-      valorNuevo: { estado: dto.estado, motivo: dto.motivo },
+      valorNuevo: { estado: nuevoEstado },
     });
 
     return actualizado;
@@ -242,7 +245,7 @@ namespace RegistroService {
       estado: undefined, // incluir todos los estados para el resumen
     });
 
-    const activos = registros.filter(r => r.estado !== Models.EstadoRegistro.RECHAZADO);
+    const activos = registros; // todos los registros cuentan, independiente del estado de pago
 
     const existente = ResumenMensualRepository.findByChoferAndPeriodo(choferId, anio, mes);
 

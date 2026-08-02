@@ -35,10 +35,8 @@ namespace DTO {
     observaciones?: string;
   }
 
-  export interface ValidarRegistroDTO {
+  export interface MarcarPagadoDTO {
     registroId: string;
-    estado: Models.EstadoRegistro.VALIDADO | Models.EstadoRegistro.RECHAZADO;
-    motivo?: string;
   }
 
   // ─── Choferes ─────────────────────────────────────────────────────────────

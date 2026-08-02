@@ -26,20 +26,18 @@ namespace Models {
   }
 
   export enum EstadoRegistro {
-    PENDIENTE = 'PENDIENTE',
-    VALIDADO = 'VALIDADO',
-    RECHAZADO = 'RECHAZADO',
+    NO_PAGADO = 'NO_PAGADO',
+    PAGADO    = 'PAGADO',
   }
 
   export enum AccionAuditoria {
-    CREAR = 'CREAR',
-    EDITAR = 'EDITAR',
-    ELIMINAR = 'ELIMINAR',
-    LOGIN = 'LOGIN',
-    EXPORTAR = 'EXPORTAR',
-    VALIDAR = 'VALIDAR',
-    RECHAZAR = 'RECHAZAR',
-    CONFIGURAR = 'CONFIGURAR',
+    CREAR         = 'CREAR',
+    EDITAR        = 'EDITAR',
+    ELIMINAR      = 'ELIMINAR',
+    LOGIN         = 'LOGIN',
+    EXPORTAR      = 'EXPORTAR',
+    MARCAR_PAGADO = 'MARCAR_PAGADO',
+    CONFIGURAR    = 'CONFIGURAR',
   }
 
   export enum ResultadoAuditoria {

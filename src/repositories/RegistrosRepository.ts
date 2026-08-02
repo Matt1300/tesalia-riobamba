@@ -111,11 +111,10 @@ namespace RegistrosRepository {
     BaseRepository.updateRow(SHEET, idx, registroToRow(registro));
   }
 
-  /** Marca un registro como eliminado cambiando su estado. */
+  /** Elimina físicamente un registro de la hoja. */
   export function markDeleted(registroId: string): void {
-    const registro = findById(registroId);
-    if (!registro) throw new Error(`Registro ${registroId} no encontrado.`);
-    registro.estado = Models.EstadoRegistro.RECHAZADO;
-    update(registro);
+    const idx = BaseRepository.findRowIndex(SHEET, C.REGISTRO_ID, registroId);
+    if (idx < 0) throw new Error(`Registro ${registroId} no encontrado.`);
+    BaseRepository.deleteRow(SHEET, idx);
   }
 }

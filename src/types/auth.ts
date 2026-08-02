@@ -18,7 +18,7 @@ namespace Auth {
     CREAR_REGISTRO = 'CREAR_REGISTRO',
     EDITAR_REGISTRO = 'EDITAR_REGISTRO',
     ELIMINAR_REGISTRO = 'ELIMINAR_REGISTRO',
-    VALIDAR_REGISTRO = 'VALIDAR_REGISTRO',
+    MARCAR_PAGADO = 'MARCAR_PAGADO',
 
     // Choferes
     VER_CHOFERES = 'VER_CHOFERES',
@@ -66,7 +66,7 @@ namespace Auth {
         Permission.CREAR_REGISTRO,
         Permission.EDITAR_REGISTRO,
         Permission.ELIMINAR_REGISTRO,
-        Permission.VALIDAR_REGISTRO,
+        Permission.MARCAR_PAGADO,
         Permission.VER_CHOFERES,
         Permission.CREAR_CHOFER,
         Permission.EDITAR_CHOFER,
