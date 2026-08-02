@@ -1982,7 +1982,9 @@
         return {
           title: "Registros",
           render: function (container) {
-            _load(container, {});
+            var hoy = new Date();
+            var primerDia = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().split("T")[0];
+            _load(container, { fechaDesde: primerDia, fechaHasta: isoToday() });
           },
         };
       }
